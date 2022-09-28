@@ -1,0 +1,58 @@
+Package: MetGUI
+Type: Package
+Title: mass spectrometry GUI
+Version: 0.1.0
+Author: Xiaodong Feng
+Maintainer: Xiaodong Feng <fengxdong@outlook.com>
+Depends: 
+    BiocParallel,blandr,
+    data.table,dplyr,dendextend,
+    EnhancedVolcano,
+    MSnbase,msPurity,magrittr,MsBackendMgf,MetaboAnnotation,
+    parallel,pls,purrr,plyr,
+    R (>= 3.6.0),
+    Spectra,stringr,
+    gWidgets2,gWidgets2RGtk2
+Imports: 
+    CAMERA,ComplexHeatmap,
+    fmcsR,
+    grDevices,graphics,ggplot2,gtools,
+    impute,imager,
+    mzR,metfRag,
+    pdist,
+    ROC,rrcov,RGtk2,Rcpp,rJava,RColorBrewer,readxl,RSQLite,
+    stats,
+    utils,usethis,
+    writexl,
+    xcms,xlsx
+Suggests: 
+    BiocStyle,
+    cowplot,
+    knitr,
+    later,
+    multtest,
+    magrittr,
+    MetaboAnalystR,
+    rmarkdown,
+    readr,
+    stringr,
+    testthat (>= 3.0.0),
+    VennDiagram
+VignetteBuilder: knitr
+Description: A GUI for LC-MS/MS based metabolomics analysis
+Encoding: UTF-8
+License: LGPL (>= 3)
+URL: https://github.com/xiaodfeng/DynamicTol
+biocViews: Metabolomics, Proteomics, Lipidomics,
+        MassSpectrometry, QualityControl, Normalization,Visualization,
+        MultipleComparison,Preprocessing, GUI, Software
+RoxygenNote: 7.1.2
+Roxygen: list(markdown = TRUE)
+LazyData: true
+NeedsCompilation: no
+BuildVignettes: true
+Collate:
+    'General.R'
+    'Plot.R'
+    'SpectralMatching.R'
+
