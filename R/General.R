@@ -1,12 +1,21 @@
 # This file contains functions used for the spectra processing
 # The functions are sorted alphabetically
 
+#' @title F_CalPMMT
+#' @description
+#' Calculate the peak matching mass tolerance (PMMT)
+#' according to the mass resolving power (MRP) and reference m/z (RefMZ)
+#' @export
 F_CalPMMT <- function(mz, MRP = 17500, RefMZ = 200) {
   A <- 1 / (MRP * (RefMZ^0.5))
   B <- A / 2.35482
   return(B * mz^1.5 + mz / 1000000)
 }
 
+#' @title F_CountCutoff
+#' @description
+#' Count how many entries are above the specified cutoffs
+#' @export
 F_CountCutoff <- function(DT) {
   setorder(DT, -dpc)
   CountCutoff.rbind <- data.table()
@@ -16,54 +25,69 @@ F_CountCutoff <- function(DT) {
   }
   return(CountCutoff.rbind)
 }
+
+#' @title F_CountSpectraPerInchikey
+#' @description
+#' Count the number of spectra for each inchikey (first 14 charactors)
+#' @export
 F_CountSpectraPerInchikey <- function(Inchikey) {
   print(paste0(Inchikey, nrow(Meta[inchikey_14_precursor_type == Inchikey])))
   return(nrow(Meta[inchikey_14_precursor_type == Inchikey]))
 }
+
+#' @title F_CountPeaksPerSpectra
+#' @description
+#' Count the number of peaks (spectra length) for each Spectra
+#' @export
 F_CountPeaksPerSpectra<-function(z){
   Len<-nrow(library_spectra[library_spectra_meta_id==z])
   print(paste(z,Len))
   return(Len)
   # Test<-TarDecUni[1:2]
-  # Test[,SpectraLength:=sapply(Test$library_lpid,
-  #                             F_CountSpectraLength)]
+  # Test[,SpectraLength:=sapply(Test$library_lpid, F_CountSpectraLength)]
 }
+
+#' @title F_CountIdentical
+#' @description
+#' Count how many pairs of query and library MS/MS are identical
+#' @export
 F_CountIdentical <- function(DT) {
   DT <- unique(DT, by = c("query_inchikey14", "library_inchikey14", "library_precursor_mz"))
   Uni <- max(nrow(unique(DT, by = "query_accession")), nrow(unique(DT, by = "library_accession")))
   print(paste("Identical pairs", nrow(DT) / 2, "Spectra number", Uni / 2))
 }
-F_CountCandidates<-function(z){
-  Len<-nrow(TarDec[query_qpid==z])
-  print(paste(z,Len))
+
+#' @title F_CountCandidates
+#' @description
+#' Count how many candidates per query
+#' @export
+F_CountCandidates <- function(z) {
+  Len <- nrow(TarDec[query_qpid == z])
+  print(paste(z, Len))
   return(Len)
 }
 
-
+#' @title F_CSV
+#' @description
+#' Easy way to export the .csv files, used for checking results quickly.
+#' @export
 F_CSV <- function(Data) {
   write.csv(Data, paste("Test.csv", seq = ""), row.names = F)
 }
 
-F_DynamicMatching <- function(top = top, bottom = bottom, RefMZ = 200, MRP = 17500) { ## Dynamic matching
-  A <- 1 / (MRP * (RefMZ^0.5))
-  B <- A / 2.35482
-  for (i in 1:nrow(bottom)) {
-    top[, 1][abs(bottom[, 1][i] - top[, 1]) < B * bottom[, 1][i]^1.5 + bottom[, 1][i] / 1000000] <- bottom[, 1][i]
-  }
-  alignment <- merge(top, bottom, by = 1, all = TRUE)
-  alignment[, c(2, 3)][is.na(alignment[, c(2, 3)])] <- 0 # convert NAs to zero (R-Help, Sept. 15, 2004, John Fox)
-  names(alignment) <- c("mz", "intensity.top", "intensity.bottom")
-  # print(alignment)
-  return(alignment)
-}
-
-
+#' @title F_DotProduct
+#' @description
+#' Calculate the dot product cosine using two vector
 #' @export
 F_DotProduct <- function(Q, L) {
   return(as.vector((Q %*% L) / (sqrt(sum(Q^2)) * sqrt(sum(L^2)))))
 }
-F_ExtractGNPSMS2 <- function(x) { # Extract MS2 according to index
-  ## Extract all MS2 spectra that were associated with the candidate using the Index
+
+#' @title F_ExtractGNPSMS2
+#' @description
+#' Extract all MS2 spectra that were associated with the candidate using the Index
+#' @export
+F_ExtractGNPSMS2 <- function(x) { 
   # print(x)
   Spectra <- GNPSSpectra[[x]]
   PeakList_matrix <- matrix(c(Spectra@mz, Spectra@intensity), ncol = 2, byrow = FALSE)
@@ -72,40 +96,32 @@ F_ExtractGNPSMS2 <- function(x) { # Extract MS2 according to index
   # print(PeakList_matrix)
   return(DT)
 }
+
+#' @title F_getPEPFromScoreLambda
+#' @import reticulate
+#' @description
+#' This function is modified based on the qvality.py file in [triqler] (https://github.com/statisticalbiotechnology/triqler/blob/master/triqler/qvality.py)
+#' Get PEP score according to the target scores and decoy scores, a regression figure is exported as well
+#' @export
 F_getPEPFromScoreLambda <- function(targetScores, decoyScores, FigName) {
-  library(reticulate)
+  # library(reticulate)
   # source_python("inst/extdata/qvality_extracted.py")
-  source_python("d:/github/dynamic/inst/extdata/qvality_extracted.py")
+  reticulate::source_python("inst/extdata/qvality_extracted.py")
   Lambda <- getPEPFromScoreLambda(targetScores, decoyScores, FigName)
-  # LambdaDynamic<-F_getPEPFromScoreLambda(TarDec$dpD, TarDec$dpD.decoy,'DynamicCurve')
 }
-joinPeaks <- function(x, y, type = "outer", tolerance = 0, ppm = 10, ...) {
-  map <- MsCoreUtils::join(x[, 1], y[, 1], type = type, tolerance = tolerance,
-                           ppm = ppm, ...)
-  list(x = x[map$x, , drop = FALSE], y = y[map$y, , drop = FALSE])
-}
-MSsim <- function(alignment) { ## similarity score calculation
-  alignment <- data.frame(alignment)
-  # print(alignment)
-  # score <- as.numeric(0)
-  # if ((sum(alignment[, 2]) > 0) & (sum(alignment[, 3]) > 0)) {
-  # alignment <- alignment[alignment[, 1] >= x.threshold, ]
-  u <- alignment[, 2]
-  v <- alignment[, 3]
-  score <- as.vector((u %*% v) / (sqrt(sum(u^2)) * sqrt(sum(v^2))))
-  # }
-  return(score)
-}
-maxTic <- function(z) {
-  z[[which.max(lapply(intensity(z), sum))]]
-}
+
+#' @title F_MergeLibrarySearch
+#' @description
+#' @import data.table
+#' Merge the .csv files after library search into a single data table
+#' @export
 F_MergeLibrarySearch <- function(Dir) {
   FileNames <- dir(Dir, full.names = TRUE, recursive = TRUE)
-  length(FileNames)
+  # length(FileNames)
   Result.rbind <- data.table::data.table()
   for (id in FileNames) {
     # id <- FileNames[3916]
-    FileNames[3911]
+    # FileNames[3911]
     ResultId <- data.table::data.table(read.csv(id))
     query_id <- sub(id, pattern = "_.*", replacement = "", perl = TRUE) %>%
       sub(id, pattern = ".*/", replacement = "", perl = TRUE)
@@ -117,49 +133,15 @@ F_MergeLibrarySearch <- function(Dir) {
   }
   return(Result.rbind)
 }
+
 .onAttach <- function(...) {
-  packageStartupMessage("\nUse 'msGUI()' to start the GUI program.")
-  # msGUI::msGUI()
+  packageStartupMessage("\nUse dynamic mass tolerance for peak matching")
 }
-F_peaks_compare_All <- function(x, y, MAPFUN = joinPeaks, FUN = ndotproduct,
-                                tolerance = 0, ppm = 10,   ...) {
-  ## Without precursor selection
-  mat <- matrix(NA_real_, nrow = length(x), ncol = length(y), dimnames = list(names(x), names(y)))
-  for (i in seq_along(x)) {
-    for (j in seq_along(y)) {
-      peak_map <- MAPFUN(x[[i]], y[[j]], tolerance = tolerance, ppm = ppm)
-      mat[i, j] <- FUN(peak_map[[1L]], peak_map[[2L]])
-    }
-  }
-  return(mat)
-}
-F_peaks_compare_Sel <- function(x, y, MAPFUN = joinPeaks, FUN = ndotproduct, UniInchikey,
-                                tolerance = 0, ppm = 10, MRP = 70000, RefMZ = 200,  ...) {
-  ## Dynamic tol for precursor selection
-  mat <- matrix(NA_real_, nrow = length(x), ncol = length(y), dimnames = list(names(x), names(y)))
-  A <- 1 / (MRP * (RefMZ^0.5))
-  B <- A / 2.35482
-  for (i in seq_along(x)) {
-    for (j in seq_along(y)) {
-      # i <- 1
-      # j <- 2
-      peak_map <- MAPFUN(x[[i]], y[[j]], tolerance = tolerance, ppm = ppm)
-      # UniInchikey[inchikey_14_precursor_mz=="OUSYWCQYMPDAEO_188.0818",]
-      InchiX <- names(x)[[i]]
-      InchiY <- names(y)[[j]]
-      Pmz_x <- UniInchikey[inchikey_14_precursor_mz==InchiX ,]$precursor_mz
-      Pmz_y <- UniInchikey[inchikey_14_precursor_mz==InchiY,]$precursor_mz
-      # mat[i, j] <- 0
-      Tol_x <- B * Pmz_x ^1.5 + Pmz_x / 1000000
-      Tol_y <- B * Pmz_y ^1.5 + Pmz_y / 1000000
-      print(paste0(names(x)[[i]],'_Tol_x_',Tol_x))
-      # print(paste0(names(y)[[j]],Pmz_y,'_Tol_y_',Tol_y))
-      if (abs(Pmz_x - Pmz_y) < Tol_x | abs(Pmz_x - Pmz_y) < Tol_y) {
-        mat[i, j] <- FUN(peak_map[[1L]], peak_map[[2L]])}
-    }
-  }
-  return(mat)
-}
+
+#' @title F_PrecursorFilt
+#' @description
+#' Filter the results based on the precursor m/z difference
+#' @export
 F_PrecursorFilt <- function(DT) {
   print(paste0("before filtration ", nrow(DT)))
   DT[, MS1Tol := F_CalPMMT(library_precursor_mz, 70000, 200)]
@@ -167,6 +149,11 @@ F_PrecursorFilt <- function(DT) {
   print(paste0("after filtration ", nrow(DT)))
   return(DT)
 }
+
+#' @title F_Selection
+#' @description
+#' Selection of the heat map cells based on the similarity scores
+#' @export
 F_Selection<-function(df,greater,lessorequal=1){
   df[df<=greater]<-NA # remove the cells less than the lower limit
   df<-df[apply(df, 1, function(x) !all(is.na(x))),]
@@ -177,18 +164,4 @@ F_Selection<-function(df,greater,lessorequal=1){
   df[is.na(df)] <- 0
   return(df)
 }
-F_TopCutoff <- function(DT, TopCutoff){
-  TarDynamic <- setorder(DT[mztol=='NA'], -dpc) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Target']
-  Tar0.005 <- setorder(DT[mztol==0.005], -dpc) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Target']
-  Tar0.028 <- setorder(DT[mztol==0.028], -dpc) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Target']
-  Tar0.050 <- setorder(DT[mztol==0.050], -dpc) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Target']
-  
-  DecDynamic <- setorder(DT[mztol=='NA'], -dpc.decoy) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Decoy']
-  Dec0.005 <- setorder(DT[mztol==0.005], -dpc.decoy) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Decoy']
-  Dec0.028 <- setorder(DT[mztol==0.028], -dpc.decoy) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Decoy']
-  Dec0.050 <- setorder(DT[mztol==0.050], -dpc.decoy) %>% .[, head(.SD, TopCutoff), by='query_qpid'] %>% .[, Database:='Decoy']
-  Top <- rbind(TarDynamic, Tar0.005, Tar0.028, Tar0.050, DecDynamic, Dec0.005, Dec0.028, Dec0.050)
-  setorder(Top, -dpc, query_qpid)
-  # print(Top[query_id== 9762])
-  return(Top)
-}
+

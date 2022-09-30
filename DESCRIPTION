@@ -12,6 +12,7 @@ Depends:
     parallel,pls,purrr,plyr,
     R (>= 3.6.0),
     Spectra,stringr,
+    utils,
     gWidgets2,gWidgets2RGtk2
 Imports: 
     CAMERA,ComplexHeatmap,

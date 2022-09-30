@@ -563,8 +563,11 @@ alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, 
   ))
 }
 
+#' @title F_DynamicMatching
+#' @description
+#' Matching between query and library using the dynamic tolerance
 #' @export
-F_DynamicMatching <- function(top = top, bottom = bottom) { ## Dynamic matching
+F_DynamicMatching <- function(top = top, bottom = bottom, RefMZ = 200, MRP = 17500) { ## Dynamic matching
   A <- 1 / (MRP * (RefMZ^0.5))
   B <- A / 2.35482
   for (i in 1:nrow(bottom)) {
@@ -748,7 +751,22 @@ getPeakCols <- function(con) {
   return(cn)
 }
 
-
+#' @title MSsim
+#' @description
+#' Similarity score calculation for a data frame
+#' @export
+MSsim <- function(alignment) { 
+  alignment <- data.frame(alignment)
+  # print(alignment)
+  # score <- as.numeric(0)
+  # if ((sum(alignment[, 2]) > 0) & (sum(alignment[, 3]) > 0)) {
+  # alignment <- alignment[alignment[, 1] >= x.threshold, ]
+  u <- alignment[, 2]
+  v <- alignment[, 3]
+  score <- as.vector((u %*% v) / (sqrt(sum(u^2)) * sqrt(sum(v^2))))
+  # }
+  return(score)
+}
 
 F_MergeTarget <- function(Target) {
   Target <- data.table(Target)

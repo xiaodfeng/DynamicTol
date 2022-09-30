@@ -1,10 +1,13 @@
 # This file contains functions used for plotting
 # The functions are sorted alphabetically
 
-#' Bland-altman plot
+#' @title F_Bland
+#' @import blandr
+#' @description
+#' Bland-altman plot based on the blandr package
 #' @export
 F_Bland <- function(x, y, name) {
-  Stat <- blandr.statistics(x, y)
+  Stat <- blandr::blandr.statistics(x, y)
   DT <- data.table("Means" = Stat$means, "Differences" = Stat$differences)
   g_plot <- ggplot(DT, aes(x = Means, y = Differences)) +
     geom_point(size = 0.8, alpha = 0.7, color = "red") +
@@ -22,16 +25,19 @@ F_Bland <- function(x, y, name) {
   return(g_plot)
 }
 
+#' @title F_Distribution
+#' @import fitdistrplus
+#' @description
+#' Fit the scores into certain kinds of distributions
+#' @export
 F_Distribution <- function(data) {
   data <- data[data > 0]
-  weibull <- fitdist(data, "weibull", method = "mle") # for positive
+  weibull <- fitdist(data, "weibull", method = "mle") 
   gamma <- fitdist(data, "gamma", method = "mle")
   norm <- fitdist(data, "norm", method = "mle")
   logis <- fitdist(data, "logis", method = "mle")
-  plot.legend <- c("weibull", "gamma", "norm", "logis") # for positive
-  # plot.legend <- c("gamma", "norm",'logis') #for neg
-  List <- list(weibull, gamma, norm, logis) # for pos
-  # List<-list(gamma, norm,logis) # for Neg
+  plot.legend <- c("weibull", "gamma", "norm", "logis") 
+  List <- list(weibull, gamma, norm, logis) 
   par(mfrow = c(2, 2))
   denscomp(List,
     legendtext = plot.legend,
@@ -51,28 +57,12 @@ F_Distribution <- function(data) {
   # print(summary(norm))
   # print(summary(logis))
 }
-F_DensityDotProduct <-function(Score, adjust = 2) {
-  # F_DensityDotProduct(Score, adjust = 2) https://stackoverflow.com/questions/60879339/setting-width-and-height-of-a-single-panel-in-multi-panel-plot-in-cowplotplot
-  Score.dp<-rbind(data.table('Score'=Score[,dpF],'Legend'='Fixed'),data.table('Score'=Score[,dpD],'Legend'='Dynamic'))
-  g_dp <- ggplot(Score.dp)  + ylab('Count') + xlab('dot product') + theme_classic() + theme(legend.position="none") +
-    geom_density(aes(x = Score, y = after_stat(count),colour = Legend), adjust = adjust) +
-    scale_colour_manual( name="Legend",values = c("Fixed" = "Green","Dynamic" = "Blue"))
-  
-  Score.dp.decoy<-rbind(data.table('Score'=Score[,dpF.decoy],'Legend'='Fixed'),data.table('Score'=Score[,dpD.decoy],'Legend'='Dynamic'))
-  g_dp.decoy <- ggplot(Score.dp.decoy)  + ylab('Count') + xlab('decoy') + theme_classic() + theme(legend.position="none") +
-    geom_density(aes(x = Score, y = after_stat(count),colour = Legend), adjust = adjust) +
-    scale_colour_manual( name="Legend",values = c("Fixed" = "Green","Dynamic" = "Blue"))
-  
-  Score.xcorr<-rbind(data.table('Score'=Score[,dpF.xcorr],'Legend'='Fixed'),data.table('Score'=Score[,dpD.xcorr],'Legend'='Dynamic'))
-  g_dp.xcorr <- ggplot(Score.xcorr)  + ylab('Count') + xlab('xcorr') + theme_classic() + theme(legend.position="none") +
-    geom_density(aes(x = Score, y = after_stat(count),colour = Legend), adjust = adjust) +
-    scale_colour_manual( name="Legend",values = c("Fixed" = "Green","Dynamic" = "Blue"))
-  # add legend
-  pL <- ggplot(Score.xcorr)  +  geom_density(aes(x = Score, y = after_stat(count),colour = Legend))+
-    scale_colour_manual( name="Legend",values = c("Fixed" = "Green","Dynamic" = "Blue"))
-  l <- cowplot::get_legend(pL)
-  cowplot::plot_grid(g_dp, g_dp.decoy, g_dp.xcorr,l,align="hv")
-}
+
+#' @title F_DensityScores
+#' @import ggplot2
+#' @description
+#' density plot for target and decoy scores distribution
+#' @export
 F_DensityScores <-function(DT, adjust = 2) {
   g_dpc <- ggplot(DT)  + ylab('Count') + xlab('dpc') + theme_classic() + theme(legend.position='top') +
     geom_density(aes(x = dpc, y = after_stat(count),colour = Legend), adjust = adjust) +
@@ -82,10 +72,6 @@ F_DensityScores <-function(DT, adjust = 2) {
     geom_density(aes(x = dpc.decoy, y = after_stat(count),colour = Legend), adjust = adjust) +
     scale_colour_manual(name="",values = ColorValues)
   # g_dpc.decoy
-  # g_dpc.xcorr <- ggplot(DT)  + ylab('Count') + xlab('dpc.xcorr') + theme_classic() + theme(legend.position="none") +
-  #   geom_density(aes(x = dpc.xcorr, y = after_stat(count),colour = Legend), adjust = adjust) +
-  #   scale_colour_manual(name="Legend",values = ColorValues)
-  # g_dpc.xcorr
   # add legend
   # pL <- ggplot(DT)  +  geom_density(aes(x = dpc, y = after_stat(count),colour = Legend))+
   #   scale_colour_manual( name="Legend",values = ColorValues)
@@ -93,39 +79,27 @@ F_DensityScores <-function(DT, adjust = 2) {
   print(plot_grid(g_dpc, g_dpc.decoy,align="v",nrow=2))
 }
 
-F_ExtractPlot <- function(MS2, PlotName) {
-  name <- paste(PlotName, ".jpeg", seq = "")
-  jpeg(file = name)
-  ggplot(MS2, aes(mz, intensity)) +
-    geom_col(colour = "black", size = 0.5) +
-    labs(title = PlotName) #+xlim(0,1000)
-  dev.off()
-}
-F_ExportPlotly <- function(fig, name = "plot", format = "svg") {
-  # https://github.com/plotly/orca/issues/298#issue-582674958
-  debug <- verbose <- safe <- F
-  b <- plotly:::plotly_build(fig)
-  plotlyjs <- plotly:::plotlyjsBundle(b)
-  plotlyjs_path <- file.path(plotlyjs$src$file, plotlyjs$script)
-  if (!is.null(plotlyjs$package)) {
-    plotlyjs_path <- system.file(plotlyjs_path, package = plotlyjs$package)
-  }
-  tmp <- tempfile(fileext = ".json")
-  cat(plotly:::to_JSON(b$x[c("data", "layout")]), file = tmp)
-  args <- c(
-    "graph", tmp, "-o", name, "--format",
-    format, "--plotlyjs", plotlyjs_path, if (debug) "--debug",
-    if (verbose) "--verbose", if (safe) "--safe-mode"
-  )
-  base::system(paste("orca", paste(args, collapse = " ")))
-}
+#' @title F_FDRCutoff
+#' @import ggplot2 data.table
+#' @description Combined functions with the following goals
+#' 1) Calculate the PEP score based on the target decoy distribution
+#' 2) Calculate the estimated qValue based on PEP accumulation
+#' 3) Calculate the estimated qValue based on target decoy
+#' 4) Calculate the actual qValue
+#' 5) Calculate the identification rate
+#' 6) Density plot for target and decoy scores
+#' 7) Thres .VS. Qvalue
+#' 8) Estimated q-value .VS. Identification Rate
+#' 9) True q-value .VS. Estimated q-value
+#' 10) Bland-altman plot for True q-value - Estimated q-value
+#' @export
 F_FDRCutoff <- function(DT, FDRCutoff, FileName, qvalueCutoff = 0.35) {
   print("Dynamic construction")
   TarDynamic <- DT[mztol == "NA" & Database == "Target"] %>% setnames(., "dpc", "Thres")
   DecDynamic <- DT[mztol == "NA" & Database == "Decoy"] %>% setnames(., "dpc.decoy", "Thres")
   Dynamic <- rbind(TarDynamic, DecDynamic, fill = TRUE)
   # Dynamic <- Dynamic[Thres!=1]
-  print("Calculate the estimated qValue based on Pep accumulation")
+  print("Calculate the estimated qValue based on PEP accumulation")
   setorder(Dynamic, -Thres) # decreasing of the score according to dpc
   LambdaDynamic <- F_getPEPFromScoreLambda(
     Dynamic[Database == "Target"]$Thres,
@@ -253,7 +227,6 @@ F_FDRCutoff <- function(DT, FDRCutoff, FileName, qvalueCutoff = 0.35) {
   dev.off()
   ## Bland plot
   svg(file = paste("Fig. 7b Bland", ".svg"))
-  
   g_Bland <- F_Bland(DynamicCut$qValue_Matr, DynamicCut$qValue_Pep, "True q-value - Estimated q-value")
   print(g_Bland)
   dev.off()
@@ -265,6 +238,12 @@ F_FDRCutoff <- function(DT, FDRCutoff, FileName, qvalueCutoff = 0.35) {
   dev.off()
   return(Dynamic)
 }
+
+#' @title F_gghistogram
+#' @import ggpubr
+#' @description histograms for the target and decoy scores at different peak matching 
+#' mass tolerance of dynamic, 0.005 Da, 0.028 Da, 0.050 Da
+#' @export
 F_gghistogram <- function(z, name, BinNum = 30) {
   ## Extract the scores seperately
   DynamicTarget <- z[mztol == "NA" & Database == "Target", ]
@@ -289,68 +268,9 @@ F_gghistogram <- function(z, name, BinNum = 30) {
   dev.off()
 }
 
-
-F_PepRegression <- function(z, name, BinNum = 30) {
-  ## Calculate the Pep score
-  LambdaDynamic <- F_getPEPFromScoreLambda(z$dpD, z$dpD.decoy, paste0(name, "DynamicCurve"))
-  z[, dpD.pep := sapply(z$dpD, LambdaDynamic[[1]])]
-  z[, dpD.qval := sapply(z$dpD, LambdaDynamic[[2]])]
-  LambdaFixed <- F_getPEPFromScoreLambda(z$dpF, z$dpF.decoy, paste0(name, "FixedCurve"))
-  z[, dpF.pep := sapply(z$dpF, LambdaFixed[[1]])]
-  z[, dpF.qval := sapply(z$dpF, LambdaFixed[[2]])]
-  Lambda0.028 <- F_getPEPFromScoreLambda(z$dp0.028, z$dp0.028.decoy, paste0(name, "Fixed0.028Curve"))
-  z[, dp0.028.pep := sapply(z$dp0.028, Lambda0.028[[1]])]
-  z[, dp0.028.qval := sapply(z$dp0.028, Lambda0.028[[2]])]
-  Lambda0.050 <- F_getPEPFromScoreLambda(z$dp0.050, z$dp0.050.decoy, paste0(name, "Fixed0.050Curve"))
-  z[, dp0.050.pep := sapply(z$dp0.050, Lambda0.050[[1]])]
-  z[, dp0.050.qval := sapply(z$dp0.050, Lambda0.050[[2]])]
-  # z$dpD.pep.neg<-1-z$dpD.pep
-  # z$dpF.pep.neg<-1-z$dpF.pep
-  ## Histogram plot with mean lines
-  # Change outline and fill colors by groups
-  # Use custom color palette
-  svg(file = paste0(name, "His_dpD", ".svg"))
-  plot(gghistogram(z,
-    x = "dpD", add = "mean", bins = BinNum,
-    color = "outcome", fill = "outcome", palette = c("#00AFBB", "#E7B800")
-  ))
-  dev.off()
-
-  svg(file = paste0(name, "His_dpF", ".svg"))
-  plot(gghistogram(z,
-    x = "dpF", add = "mean", bins = BinNum,
-    color = "outcome", fill = "outcome", palette = c("#00AFBB", "#E7B800")
-  ))
-  dev.off()
-
-  svg(file = paste0(name, "His_dpD_decoy", ".svg"))
-  plot(gghistogram(z,
-    x = "dpD.decoy", add = "mean", bins = BinNum,
-    color = "outcome", fill = "outcome", palette = c("#00AFBB", "#E7B800")
-  ))
-  dev.off()
-
-  svg(file = paste0(name, "His_dpF_decoy", ".svg"))
-  plot(gghistogram(z,
-    x = "dpF.decoy", add = "mean", bins = BinNum,
-    color = "outcome", fill = "outcome", palette = c("#00AFBB", "#E7B800")
-  ))
-  dev.off()
-
-  svg(file = paste0(name, "His_dp0.028", ".svg"))
-  plot(gghistogram(z,
-    x = "dp0.028", add = "mean", bins = BinNum,
-    color = "outcome", fill = "outcome", palette = c("#00AFBB", "#E7B800")
-  ))
-  dev.off()
-  svg(file = paste0(name, "His_dp0.050", ".svg"))
-  plot(gghistogram(z,
-    x = "dp0.050", add = "mean", bins = BinNum,
-    color = "outcome", fill = "outcome", palette = c("#00AFBB", "#E7B800")
-  ))
-  dev.off()
-  # F_PepRegression(z=TopN, name=paste0('Top',TopCutoff),BinNum=50)
-}
+#' @title F_PlotcombinePeaks
+#' @description Consensus plot of the spectra before and after combining
+#' @export
 F_PlotcombinePeaks <- function(MetaL, inchi, Single, Sensus, Color) {
   Selected <- MetaL[inchikey_14_precursor_mz == inchi]
   ## Extract MS2 spectra related to each meta id
@@ -388,6 +308,11 @@ F_PlotcombinePeaks <- function(MetaL, inchi, Single, Sensus, Color) {
   dev.off()
 }
 
+#' @title F_plot.roc
+#' @import pROC
+#' @description ROC plot for scores at different peak matching 
+#' mass tolerance of dynamic, 0.005 Da, 0.028 Da, 0.050 Da
+#' @export
 F_plot.roc <- function(z, name, BinNum = 30) {
   ## Extract the scores seperately
   DynamicTarget <- z[mztol == "NA" & Database == "Target", ]
@@ -431,50 +356,10 @@ F_plot.roc <- function(z, name, BinNum = 30) {
   return(Results)
 }
 
-F_PLotMir <- function(Top, Bottom, labelTitle, Query_inchkey, Library_inchkey, labelTop, labelBottom) {
-  spec.top <- data.table("mz" = Top$mz, "intensity" = Top$i)
-  spec.bottom <- data.table("mz" = Bottom$mz, "intensity" = Bottom$i)
-  b <- 0
-  top_tmp <- data.frame(mz = spec.top[, 1], intensity = spec.top[, 2])
-  top_tmp$normalized <- round((top_tmp$intensity / max(top_tmp$intensity)) * 100, digits = 2)
-  top_plot <- data.frame(mz = top_tmp$mz, intensity = top_tmp$normalized) # data frame for plotting spectrum
-  top <- subset(top_plot, top_plot$intensity > b) # data frame for similarity score calculation
-  bottom_tmp <- data.frame(mz = spec.bottom[, 1], intensity = spec.bottom[, 2])
-  bottom_tmp$normalized <- round((bottom_tmp$intensity / max(bottom_tmp$intensity)) * 100, digits = 2)
-  bottom_plot <- data.frame(mz = bottom_tmp$mz, intensity = bottom_tmp$normalized) # data frame for plotting spectrum
-  bottom <- subset(bottom_plot, bottom_plot$intensity > b) # data frame for similarity score calculation
-  ## Dynamic matching
-  alignment <- F_DynamicMatching(top, bottom)
-  Score <- MSsim(dplyr::filter(alignment, intensity.bottom > 0)) %>% formatC(., format = "f", digits = 3) # round(.,digits = 4)
-  print(Score)
-  Equal <- setequal(top, bottom)
-  ## plot the head to tail target
-  svg(paste(
-    "Equal", Equal, "Score", Score, "Precursor mz", labelTitle,
-    "Query_inchkey", Query_inchkey, "Library_inchkey", Library_inchkey,
-    ".svg"
-  )) # ,width = 1000, height = 1100
-  mzRange <- range(alignment$mz)
-  # xlim <- c(mzRange[1] - 25, mzRange[2] + 25)
-  xlim <- c(50, 150) # for plotting specific figure
-  plot.new()
-  plot.window(xlim = xlim, ylim = c(-125, 125))
-  ticks <- c(-100, -50, 0, 50, 100)
-  # COL <- adjustcolor(c("blue"), alpha.f = 1)
-  for (i in 1:length(top_plot$mz)) lines(rep(top_plot$mz[i], 2), c(0, top_plot$intensity[i]), col = "blue", lwd = 1) ## Add line
-  for (i in 1:length(bottom_plot$mz)) lines(rep(bottom_plot$mz[i], 2), c(0, -bottom_plot$intensity[i]), col = "red")
-  axis(2, at = ticks, labels = abs(ticks), pos = xlim[1], ylab = "intensity")
-  axis(1, pos = -125)
-  lines(xlim, c(0, 0))
-  rect(xlim[1], -125, xlim[2], 125)
-  mtext("m/z", side = 1, line = 2)
-  mtext("intensity (%)", side = 2, line = 2)
-  title(paste("Score", Score, "Precursor m/z", labelTitle))
-  text(mean(xlim), 100, labelTop)
-  text(mean(xlim), -100, labelBottom)
-  dev.off()
-  return(Equal)
-}
+#' @title F_PLotMirOfftarget 
+#' @description Plot to show different compounds with similar MS2 spectra pattern
+#' This function needs the another function of F_PLotMir
+#' @export
 F_PLotMirOfftarget <- function(DT, MSMS) {
   for (id in c(1:nrow(DT))) {
     # id <- 1
@@ -502,6 +387,53 @@ F_PLotMirOfftarget <- function(DT, MSMS) {
   }
   return(DT)
 }
+
+F_PLotMir <- function(Top, Bottom,labelTitle,Query_inchkey,Library_inchkey,labelTop,labelBottom){
+  spec.top <-data.table("mz" = Top$mz, "intensity" = Top$i)
+  spec.bottom <-data.table("mz" = Bottom$mz, "intensity" = Bottom$i)
+  b=0
+  top_tmp <-data.frame(mz = spec.top[, 1], intensity = spec.top[, 2])
+  top_tmp$normalized <-round((top_tmp$intensity / max(top_tmp$intensity)) * 100, digits = 2)
+  top_plot <-data.frame(mz = top_tmp$mz, intensity = top_tmp$normalized)   # data frame for plotting spectrum
+  top <-subset(top_plot, top_plot$intensity > b)   # data frame for similarity score calculation
+  bottom_tmp <-data.frame(mz = spec.bottom[, 1], intensity = spec.bottom[, 2])
+  bottom_tmp$normalized <-round((bottom_tmp$intensity / max(bottom_tmp$intensity)) * 100, digits = 2)
+  bottom_plot <-data.frame(mz = bottom_tmp$mz, intensity = bottom_tmp$normalized)   # data frame for plotting spectrum
+  bottom <-subset(bottom_plot, bottom_plot$intensity > b)   # data frame for similarity score calculation
+  ## Dynamic matching
+  alignment <- F_DynamicMatching(top, bottom)
+  Score <- MSsim(dplyr::filter(alignment,intensity.bottom > 0)) %>% formatC(., format = "f", digits = 3) #round(.,digits = 4)
+  print(Score)
+  Equal <- setequal(top, bottom)
+  ## plot the head to tail target
+  svg(paste('Equal',Equal,'Score',Score,'Precursor mz',labelTitle,
+            'Query_inchkey',Query_inchkey,'Library_inchkey', Library_inchkey,
+            '.svg')) #,width = 1000, height = 1100
+  mzRange <- range(alignment$mz)
+  # xlim <- c(mzRange[1] - 25, mzRange[2] + 25)
+  xlim <- c(50, 150) # for plotting specific figure
+  plot.new()
+  plot.window(xlim = xlim, ylim = c(-125, 125))
+  ticks <- c(-100, -50, 0, 50, 100)
+  # COL <- adjustcolor(c("blue"), alpha.f = 1)
+  for (i in 1:length(top_plot$mz)) lines(rep(top_plot$mz[i], 2), c(0, top_plot$intensity[i]), col = 'blue',lwd=1) ## Add line
+  for (i in 1:length(bottom_plot$mz)) lines(rep(bottom_plot$mz[i], 2), c(0, -bottom_plot$intensity[i]), col = "red")
+  axis(2, at = ticks, labels = abs(ticks), pos = xlim[1], ylab = "intensity")
+  axis(1, pos = -125)
+  lines(xlim, c(0, 0))
+  rect(xlim[1], -125, xlim[2], 125)
+  mtext("m/z", side = 1, line = 2)
+  mtext("intensity (%)", side = 2, line = 2)
+  title(paste('Score',Score,'Precursor m/z',labelTitle))
+  text(mean(xlim), 100, labelTop)
+  text(mean(xlim), -100, labelBottom)
+  dev.off()
+  return(Equal)
+}
+
+#' @title F_PlotMSMS
+#' @description Mirror plot to show the matched and unmatched peaks between query and library
+#' @export
 F_PlotMSMS <- function(alignment, bottom_plot, top_plot) {
   ## generate plot
   ## calculation based on the common
@@ -539,6 +471,10 @@ F_PlotMSMS <- function(alignment, bottom_plot, top_plot) {
   }
 }
 
+#' @title F_PlotMSMSOriginal
+#' @description Original mirror plot to show the matched and unmatched peaks between query and library
+#' this function is simple compared to the F_PlotMSMS function
+#' @export
 F_PlotMSMSOriginal <- function(alignment, top_plot, bottom_plot, Lwd = 1, label, dp) {
   ## To plot the original MSMS head to tail figure, for demonstration purpose
   ## calculation based on the common
@@ -558,60 +494,15 @@ F_PlotMSMSOriginal <- function(alignment, top_plot, bottom_plot, Lwd = 1, label,
   mtext("intensity (%)", side = 2, line = 2)
   text(mean(xlim), 100, label)
   # text(mean(xlim), 80, paste("dp", formatC(dp, format = "e", digits = 3)))
-
   # svg(paste('Decoy Offset = dynamic range', '.svg')) #,width = 1000, height = 1100
   # F_PlotMSMSOriginal(alignment = AlignFixedDecoy.rbind,top_plot=decoy_plot.rbind,bottom_plot=bottom_plot,
   #                    Lwd=0.005, label = paste('Decoy Offset = dynamic range'),dp = dpFDecoy.rbind)
   # dev.off()
 }
 
-
-
-F_PlotMSMSXcorr <- function(alignment, top_plot, bottom_plot, label, dp) {
-  ## To plot the original MSMS head to tail figure, for demonstration purpose
-  ## calculation based on the common
-  mzRange <- range(alignment$mz)
-  xlim <- c(mzRange[1] - 25, mzRange[2] + 25)
-  plot.new()
-  plot.window(xlim = xlim, ylim = c(-125, 125))
-  ticks <- c(-100, -50, 0, 50, 100)
-  for (i in 1:length(top_plot$mz)) lines(rep(top_plot$mz[i], 2), c(0, top_plot$intensity[i]), col = "blue") ## Add line
-  for (i in 1:length(bottom_plot$mz)) lines(rep(bottom_plot$mz[i], 2), c(0, -bottom_plot$intensity[i]), col = "red")
-  axis(2, at = ticks, labels = abs(ticks), pos = xlim[1], ylab = "intensity")
-  axis(1, pos = -125)
-  lines(xlim, c(0, 0))
-  rect(xlim[1], -125, xlim[2], 125)
-  mtext("m/z", side = 1, line = 2)
-  mtext("intensity (%)", side = 2, line = 2)
-  text(mean(xlim), 100, label)
-  text(mean(xlim), 80, paste("dp", round(dp, digits = 4)))
-  ## Add the mz value if there is a match
-  align_plot <- data.table(subset(alignment, alignment$intensity.top > 0))
-  align_plot[, Topmz := top$mz]
-  align_plot[, Da := formatC(abs(Topmz - mz), format = "e", digits = 2)]
-  align_plot[, Roundmz := formatC(mz, format = "f", digits = 2)]
-  align_plot <- align_plot[intensity.bottom > 0]
-  if (length(align_plot$mz) > 0) {
-    for (i in 1:length(align_plot$mz)) {
-      text(align_plot$mz[i], -align_plot$intensity.bottom[i] - 15, align_plot$Roundmz[i], col = "red", cex = 0.5, srt = 90)
-      text(align_plot$mz[i], align_plot$intensity.top[i] + 15, align_plot$Da[i], col = "blue", cex = 0.5, srt = 90)
-    }
-  }
-}
-F_ROC <- function(Sensus,Name){
-  png(paste(Name,'Sensus Inch.VS.Matr xcorr.VS.dpc','ROC.png'),width = 1000, height = 1000) # ,res = 300
-  layout(matrix(c(1,2,3,4), nrow = 2, ncol = 2, byrow = TRUE))
-  # png(paste(Name,'Single.VS.Sensus Inch.VS.Matr xcorr','ROC.png'),width = 1500, height = 1500) # ,res = 300
-  # layout(matrix(c(1,2,3,4), nrow = 2, ncol = 2, byrow = TRUE))
-  # Single[,outcome:=outcomeInch] %>% .[,score:=dpc.xcorr] %>% F_plot.roc(z=., name=paste0('SingleInch'))
-  # Single[,outcome:=outcomeMatr] %>% .[,score:=dpc.xcorr] %>% F_plot.roc(z=., name=paste0('SingleMatr'))
-  Sensus[,outcome:=outcomeInch] %>% .[,score:=dpc.xcorr] %>% F_plot.roc(z=., name=paste0('SensusInchXcorr'))
-  Sensus[,outcome:=outcomeMatr] %>% .[,score:=dpc.xcorr] %>% F_plot.roc(z=., name=paste0('SensusMatrXcorr'))
-  Sensus[,outcome:=outcomeInch] %>% .[,score:=dpc] %>% F_plot.roc(z=., name=paste0('SensusInchDpc'))
-  Sensus[,outcome:=outcomeMatr] %>% .[,score:=dpc] %>% F_plot.roc(z=., name=paste0('SensusMatrDpc'))
-  dev.off()
-}
-
+#' @title F_simplot
+#' @description Heatmap of the matrix based on the similarity cutoff
+#' @export
 F_simplot <- function(mat, FileName) {
   # matAbove <- mat[1:Cutoff,1:Cutoff]
   # View(matAbove)
@@ -619,6 +510,12 @@ F_simplot <- function(mat, FileName) {
   plot(DOSE::simplot(mat, xlab = "InchiKey", ylab = "InchiKey", font.size = 3, labs = F, color.high = "red"))
   dev.off()
 }
+
+#' @title F_SpectrumLoop
+#' @description In a loop, calcualte the mirror plots between query and library with
+#' fixed mztol of 0.005 Da and dynamic mztol
+#' This function needs F_SpectrumSingle and F_SpectrumSimilarity
+#' @export
 F_SpectrumLoop <- function(Spectra, FT, mztol) {
   # ScoreDT <- F_SpectrumLoop(Spectra = Spectra, FT = Test, mztol = 0.005)
   # ScoreDT <- F_SpectrumLoop(Spectra = Spectra, FT = filteredFeature, mztol = 0.005)
@@ -627,6 +524,12 @@ F_SpectrumLoop <- function(Spectra, FT, mztol) {
   ScoreDT <- data.table(plyr::ldply(ScoreDT, data.frame))
   return(ScoreDT)
 }
+
+#' @title F_SpectrumSingle
+#' @description In a single, calcualte the mirror plots between query and library with
+#' fixed mztol of 0.005 Da and dynamic mztol
+#' This function needs F_SpectrumSimilarity
+#' @export
 F_SpectrumSingle <- function(x) {
   ft <- x[1]
   mz <- as.numeric(x[2])
@@ -644,8 +547,11 @@ F_SpectrumSingle <- function(x) {
   return(ScoreDT)
 }
 
+#' @title F_SpectrumSimilarity
+#' @description Plot the mirror plot and calculate the similarity score between query and library with
+#' fixed mztol of 0.005 Da and dynamic mztol
+#' @export
 F_SpectrumSimilarity <- function(spec.top, spec.bottom, mztol = 0.005, mz, rt, int, ft, b = 0, x.threshold = 0) {
-
   ## For testing purpose
   # feature_id <- "FT0003"
   # ex_FT <- Spectra[mcols(Spectra)$feature_id == feature_id]
@@ -695,7 +601,6 @@ F_SpectrumSimilarity <- function(spec.top, spec.bottom, mztol = 0.005, mz, rt, i
   dpF.decoy <- MSsim(MergeFixed)
   dpF.xcorr <- dpF - dpF.decoy
   # rdpF.decoy <- MSsim(AlignFixed.decoy[AlignFixed.decoy[, 3] > 0, ])
-
   dpD.decoy <- MSsim(MergeDynamic)
   dpD.xcorr <- dpD - dpD.decoy
   # rdpD.decoy <- MSsim(AlignDynamic.decoy[AlignDynamic.decoy[, 3] > 0, ])
@@ -707,10 +612,8 @@ F_SpectrumSimilarity <- function(spec.top, spec.bottom, mztol = 0.005, mz, rt, i
   par(mfcol = c(2, 1), mar = c(4.5, 3.5, 1, 1)) #
   F_PlotMSMS(alignment = AlignFixed, top_plot = top_plot, top = top, bottom_plot = bottom_plot, bottom = bottom)
   title(paste("fixed tol, dp", round(dpF, digits = 3), "decoy", formatC(dpF.decoy, format = "e", digits = 3), "xcorr", round(dpF.xcorr, digits = 3)), outer = F)
-
   F_PlotMSMS(alignment = AlignDynamic, top_plot = top_plot, top = top, bottom_plot = bottom_plot, bottom = bottom)
   title(paste("dynamic tol, dp", round(dpD, digits = 3), "decoy", formatC(dpD.decoy, format = "e", digits = 3), "xcorr", round(dpD.xcorr, digits = 3)), outer = F)
-
   dev.off()
   ScoreDT <- data.table(
     "Row.names" = ft,
