@@ -2,7 +2,7 @@
 The package contains scripts aiming for dynamic tolerance peak matching and false discovery estimation for metabolite identification using spectral library search. The novelties of the package are:
 
 1. Use peak matching instead of peak binning to calculate the cosine dot product score.
-2. Dynamic mass tolerance in peak matching. We set dynamic tolerance on *m/z* for peak matching proportional with peak width according to the mass spectrometry type, which is proportional to ![img](file:///C:/Users/xiaodong/AppData/Local/Temp/msohtmlclip1/01/clip_image002.gif) for FTICR, to ![img](file:///C:/Users/xiaodong/AppData/Local/Temp/msohtmlclip1/01/clip_image004.gif) for Orbitrap, to *m/z* for Q-TOF, and is a constant for quadrupole mass analyzer.
+2. Dynamic mass tolerance in peak matching. We set dynamic tolerance on *m/z* for peak matching proportional with peak width according to the mass spectrometry type, which is proportional to (m/z)^2  for FTICR, to (m/z)^1.5 for Orbitrap, to *m/z* for Q-TOF, and is a constant for quadrupole mass analyzer.
 3. Calculated the decoy score as the average of the cosine similarity score between the target and mass-shifted query spectra. 
 4. Enable the calculation of Xcorr score based on the difference between target score and decoy score.
 5. Enable the PEP score and FDR estimation based on the target and decoy strategy.
