@@ -112,8 +112,8 @@ F_getPEPFromScoreLambda <- function(targetScores, decoyScores, FigName) {
 
 #' @title F_MergeLibrarySearch
 #' @description
-#' @import data.table
 #' Merge the .csv files after library search into a single data table
+#' @import data.table
 #' @export
 F_MergeLibrarySearch <- function(Dir) {
   FileNames <- dir(Dir, full.names = TRUE, recursive = TRUE)

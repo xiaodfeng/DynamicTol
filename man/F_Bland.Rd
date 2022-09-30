@@ -2,10 +2,10 @@
 % Please edit documentation in R/Plot.R
 \name{F_Bland}
 \alias{F_Bland}
-\title{Bland-altman plot}
+\title{F_Bland}
 \usage{
 F_Bland(x, y, name)
 }
 \description{
-Bland-altman plot
+Bland-altman plot based on the blandr package
 }
