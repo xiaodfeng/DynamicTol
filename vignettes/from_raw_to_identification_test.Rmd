@@ -1,0 +1,35 @@
+---
+title: "from raw to identification"
+author: "Xiaodong Feng"
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output:
+  BiocStyle::html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    toc_float: true
+
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE, cache = FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = FALSE)
+# knitr::opts_knit$set(root.dir = "d:/github/DynamicTol/vignettes") # The user needs to change the directory accordingly
+```
+
+# Introduction
+
+This document contains basic steps of processing LC-MS datasets. This workflow aims to improve the identification part in LC-MS-based metabolomics. 
+
+# Load required packages and functions
+The user needs to change the directory accordingly
+```{r packages and functions, warnings=FALSE, message=FALSE, cache=FALSE}
+# source("d:/github/DynamicTol/vignettes/Alternative way to use the package.R") 
+```
+
+
+
+

@@ -131,6 +131,12 @@ F_MergeLibrarySearch <- function(Dir){
   return(Result.rbind)
 }
 
+norm_fun <- function(z, ...) {
+  z[, "intensity"] <- z[, "intensity"] /
+    max(z[, "intensity"], na.rm = TRUE) * 100
+  z
+}
+
 .onAttach <- function(...) {
   packageStartupMessage("\nUse dynamic mass tolerance for peak matching")
 }
