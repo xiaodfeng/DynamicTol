@@ -1,6 +1,5 @@
 # This file contains functions used for the spectra processing
 # The functions are sorted alphabetically
-
 #' @title F_CalPMMT
 #' @description
 #' Calculate the peak matching mass tolerance (PMMT)
@@ -115,21 +114,19 @@ F_getPEPFromScoreLambda <- function(targetScores, decoyScores, FigName) {
 #' Merge the .csv files after library search into a single data table
 #' @import data.table
 #' @export
-F_MergeLibrarySearch <- function(Dir) {
-  FileNames <- dir(Dir, full.names = TRUE, recursive = TRUE)
-  # length(FileNames)
-  Result.rbind <- data.table::data.table()
+F_MergeLibrarySearch <- function(Dir){
+  FileNames<-dir(Dir, full.names = TRUE, recursive = TRUE)
+  print(paste('File length',length(FileNames)))
+  Result.rbind<-data.table::data.table()
   for (id in FileNames) {
     # id <- FileNames[3916]
-    # FileNames[3911]
     ResultId <- data.table::data.table(read.csv(id))
-    query_id <- sub(id, pattern = "_.*", replacement = "", perl = TRUE) %>%
-      sub(id, pattern = ".*/", replacement = "", perl = TRUE)
-    ResultId[, query_id := query_id]
-    mztol <- sub(id, pattern = ".csv", replacement = "", perl = TRUE) %>%
-      sub(id, pattern = ".*_", replacement = "", perl = TRUE)
-    ResultId[, mztol := mztol]
-    Result.rbind <- rbind(Result.rbind, ResultId, fill = TRUE)
+    id.short <- sub(".*/","",id) %>% sub(".csv","",.)
+    id.split <-  unlist(strsplit(id.short, '_'))
+    ResultId[, query_id := id.split[1]]
+    ResultId[, mztol := id.split[2]]
+    ResultId[, libsch := id.split[3]]
+    Result.rbind<-rbind(Result.rbind,ResultId,fill=TRUE)
   }
   return(Result.rbind)
 }

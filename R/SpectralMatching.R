@@ -195,8 +195,8 @@
 spectralMatching <- function(q_dbPth,
                              l_dbPth,
                              q_purity = NA,
-                             q_ppmProd = 20,
-                             q_ppmPrec = 20,
+                             q_ppmProd = 10,
+                             q_ppmPrec = 5,
                              q_raThres = NA,
                              q_pol = NA,
                              q_instrumentTypes = NA,
@@ -209,8 +209,8 @@ spectralMatching <- function(q_dbPth,
                              q_xcmsGroups = NA,
                              q_accessions = NA,
                              l_purity = NA,
-                             l_ppmProd = 20,
-                             l_ppmPrec = 20,
+                             l_ppmProd = 10,
+                             l_ppmPrec = 5,
                              l_raThres = NA,
                              l_pol = NA,
                              l_instrumentTypes = NA,
@@ -227,6 +227,8 @@ spectralMatching <- function(q_dbPth,
                              mzW = 0,
                              rttol = NA,
                              mztol = NA,
+                             libsch = 'reverse', # reverse for reverse library search, and forward for forward library search
+                             decoy = FALSE, # TRUE to generate the decoy spectra
                              q_dbType = "sqlite",
                              q_dbName = NA,
                              q_dbHost = NA,
@@ -317,10 +319,9 @@ spectralMatching <- function(q_dbPth,
     # cl <- parallel::makeCluster(cores, type = "SOCK")
     # doSNOW::registerDoSNOW(cl)
     # clusterCall(cl, function() library(magrittr))
-    # cl = createCluster(cores,
-    #                    export = list('getSmeta','getScanPeaksSqlite','getPeakCols','queryVlibrarySingle','alignAndMatch','align','mzCompare','overlap','dpc'),
-    #                    lib = list('ggplot2','plyr','dplyr','data.table'))
-    cl = 5
+    cl = createCluster(cores,
+                       export = list('getSmeta','getScanPeaksSqlite','getPeakCols','queryVlibrarySingle','alignAndMatch','align','mzCompare','overlap','dpc'),
+                       lib = list('ggplot2','plyr','dplyr','data.table'))
     parallel <- TRUE
     print(paste('Core number',cl))
   } else {
@@ -343,6 +344,8 @@ spectralMatching <- function(q_dbPth,
                          raW = raW,
                          rttol = rttol,
                          mztol = mztol,
+                         libsch = libsch,
+                         decoy = decoy,
                          dbDetails = dbDetails,
                          .parallel = parallel
   )
@@ -383,12 +386,12 @@ spectralMatching <- function(q_dbPth,
   } else {
     additional_details <- NULL
   }
-  if (nrow(additional_details) == 0) {
-    additional_details <- NULL
-  }
-  if (!is.null(additional_details)) {
-    matched <- merge(matched, additional_details, by = "lpid")
-  }
+  # if (nrow(additional_details) == 0) {
+  #   additional_details <- NULL
+  # }
+  # if (!is.null(additional_details)) {
+  #   matched <- merge(matched, additional_details, by = "lpid")
+  # }
   if (updateDb) {
     custom_dbWriteTable(name_pk = "mid", df = matched, fks = NA, table_name = "sm_matches", con = q_con)
     if (DBI::dbExistsTable(l_con, "metab_compound")) {
@@ -452,12 +455,12 @@ spectralMatching <- function(q_dbPth,
   # matched$mid <- 1:nrow(matched)
   # Add rtdiff
   # matched$rtdiff <- as.numeric(matched$library_rt) - as.numeric(matched$query_rt)
-  name <- paste0(q_pids,'_',mztol, '.csv')
+  name <- paste0(q_pids,'_',mztol,'_',libsch, '.csv')
   write.csv(matched, name,row.names = F)
   return(matched)
 }
 
-alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol) {
+alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,libsch,decoy) {
   # For testing purpose begin
   # top <-data.frame("mz" = c(86.09695,486.42896,610.41681,669.48749,
   #                           104.10786,114.41492,131.05865,146.98178,230.20305),
@@ -488,59 +491,71 @@ alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, 
   bottom.ra <- data.frame('mz'=l_speaksi$mz,'intensity'=l_speaksi$ra)
   # aligned <- align(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raDiffThres = 10) # original function, slow
   ## Target
-  if (is.na(mztol)) {
-    ## Dynamic matching
+  if (is.na(mztol)) {     ## Dynamic matching
     Align <- F_DynamicMatching(top = top, bottom = bottom, MRP= MRPValue,RefMZ = RefMZValue) #
-  } else {
-    ## Fixed matching
+  } else if (mztol <= 1) {     ## Fixed matching with Da unit
     Align <- F_FixedMatching(top = top, bottom = bottom, mztol = mztol)
+  } else {     ## Fixed matching with PPM unit
+    Align <- F_FixedMatchingPPM(top = top, bottom = bottom, mztol = mztol)
   }
   Match <- nrow(Align[(Align[, 3] > 0)&(Align[, 2] > 0), ])
   dpc <- 0
-  if (Match>0){
+  if (Match > 0 & libsch == 'reverse'){
     ## Merge the results in case there are multiple hits per library
     MergeAlign<-F_MergeTarget(Align[Align[, 3] > 0, ])
     dpc <- MSsim(MergeAlign)
   }
-  ## Decoy search
-  decoy.rbind <- data.table()
-  HalfLenth <- 75
-  PMMTmin<-F_CalPMMT(min(top.ra$mz),MRP= MRPValue,RefMZ = RefMZValue) #
-  PMMTmax<-F_CalPMMT(max(top.ra$mz),MRP= MRPValue,RefMZ = RefMZValue) #
-  # print(paste0('MRPValue ',MRPValue,' RefMZValue ',RefMZValue))
-  ## dot product of decoy
-  if (is.na(mztol)) {
-    ## Dynamic matching
-    for (id in c(seq(-HalfLenth,-1), seq(1,HalfLenth))) {
-      decoy <-  top.ra
-      decoy$mz <- top.ra$mz + 1.5*(id/abs(id))*PMMTmax + id*PMMTmin
-      decoy.rbind <- rbind(decoy.rbind, decoy)
-    }
-    decoy.rbind <- decoy.rbind [mz>0] # exclude the entries with mz less than zero
-    setorder(decoy.rbind,mz)
-    decoy.rbind<-as.data.frame(decoy.rbind)
-    Align.decoy <- F_DynamicMatching(top = decoy.rbind, bottom = bottom.ra, MRP= MRPValue,RefMZ = RefMZValue)
-  } else {
-    ## Fixed matching
-    for (id in c(seq(-HalfLenth,-1), seq(1,HalfLenth))) {
-      decoy <-  top.ra
-      decoy$mz <- top.ra$mz + 1.5*(id/abs(id))*PMMTmax + id*PMMTmin
-      decoy.rbind <- rbind(decoy.rbind, decoy)
-    }
-    decoy.rbind <- decoy.rbind [mz>0] # exclude the entries with mz less than zero
-    setorder(decoy.rbind,mz)
-    decoy.rbind<-as.data.frame(decoy.rbind)
-    Align.decoy <- F_FixedMatching(top = decoy.rbind, bottom = bottom.ra)
-  }
-  Match.decoy<-nrow(Align.decoy[(Align.decoy[, 3] > 0)&(Align.decoy[, 2] > 0), ])
-  dpc.decoy <- 0
-  if (Match.decoy>0){
+  if (Match > 0 & libsch == 'forward'){
     ## Merge the results in case there are multiple hits per library
-    MergeAlign.decoy<-F_MergeDecoy(Align.decoy[Align.decoy[, 3] > 0, ])
-    # MergeAlign.decoyCom<-MergeAlign.decoy[(MergeAlign.decoy[, 3] > 0)&(MergeAlign.decoy[, 2] > 0), ]
-    ## Calculate the dot product and xcorr score
-    # dp.decoy <- F_DP(MergeAlign.decoy)[[1]]
-    dpc.decoy <- MSsim(MergeAlign.decoy)
+    MergeAlign<-F_MergeTarget(Align)
+    dpc <- MSsim(MergeAlign)
+  }
+  ## Decoy search
+  if (decoy){
+    decoy.rbind <- data.table()
+    HalfLenth <- 75
+    PMMTmin<-F_CalPMMT(min(top.ra$mz),MRP= MRPValue,RefMZ = RefMZValue) #
+    PMMTmax<-F_CalPMMT(max(top.ra$mz),MRP= MRPValue,RefMZ = RefMZValue) #
+    # print(paste0('MRPValue ',MRPValue,' RefMZValue ',RefMZValue))
+    ## dot product of decoy
+    if (is.na(mztol)) {     ## Dynamic matching
+      for (id in c(seq(-HalfLenth,-1), seq(1,HalfLenth))) {
+        decoy <-  top.ra
+        decoy$mz <- top.ra$mz + 1.5*(id/abs(id))*PMMTmax + id*PMMTmin
+        decoy.rbind <- rbind(decoy.rbind, decoy)
+      }
+      decoy.rbind <- decoy.rbind [mz>0] # exclude the entries with mz less than zero
+      setorder(decoy.rbind,mz)
+      decoy.rbind<-as.data.frame(decoy.rbind)
+      Align.decoy <- F_DynamicMatching(top = decoy.rbind, bottom = bottom.ra, MRP= MRPValue,RefMZ = RefMZValue)
+    } else { ## Fixed matching
+      for (id in c(seq(-HalfLenth,-1), seq(1,HalfLenth))) {
+        decoy <-  top.ra
+        decoy$mz <- top.ra$mz + 1.5*(id/abs(id))*PMMTmax + id*PMMTmin
+        decoy.rbind <- rbind(decoy.rbind, decoy)
+      }
+      decoy.rbind <- decoy.rbind [mz>0] # exclude the entries with mz less than zero
+      setorder(decoy.rbind,mz)
+      decoy.rbind<-as.data.frame(decoy.rbind)
+      Align.decoy <- F_FixedMatching(top = decoy.rbind, bottom = bottom.ra)
+    }
+    Match.decoy<-nrow(Align.decoy[(Align.decoy[, 3] > 0)&(Align.decoy[, 2] > 0), ])
+    dpc.decoy <- 0 # set the default value of the score
+    if (Match.decoy > 0 & libsch == 'reverse'){
+      ## Merge the results in case there are multiple hits per library
+      MergeAlign.decoy<-F_MergeDecoy(Align.decoy[Align.decoy[, 3] > 0, ])
+      # MergeAlign.decoyCom<-MergeAlign.decoy[(MergeAlign.decoy[, 3] > 0)&(MergeAlign.decoy[, 2] > 0), ]
+      ## Calculate the dot product and xcorr score
+      # dp.decoy <- F_DP(MergeAlign.decoy)[[1]]
+      dpc.decoy <- MSsim(MergeAlign.decoy)
+    }
+    if (Match.decoy > 0 & libsch == 'forward'){
+      MergeAlign.decoy<-F_MergeDecoy(Align.decoy)
+      dpc.decoy <- MSsim(MergeAlign.decoy)
+    }
+  } else {
+    dpc.decoy <- NA
+    Match.decoy <- NA
   }
   dpc.xcorr <- dpc - dpc.decoy
   ## Echo
@@ -563,11 +578,12 @@ alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, 
   ))
 }
 
+
 #' @title F_DynamicMatching
 #' @description
 #' Matching between query and library using the dynamic tolerance
 #' @export
-F_DynamicMatching <- function(top = top, bottom = bottom, RefMZ = 200, MRP = 17500) { ## Dynamic matching
+F_DynamicMatching <- function(top = top, bottom = bottom, RefMZ=200, MRP = 17500) {## Dynamic matching
   A <- 1 / (MRP * (RefMZ^0.5))
   B <- A / 2.35482
   for (i in 1:nrow(bottom)) {
@@ -579,6 +595,7 @@ F_DynamicMatching <- function(top = top, bottom = bottom, RefMZ = 200, MRP = 175
   # print(alignment)
   return(alignment)
 }
+
 
 filterSMeta <- function(purity = NA, raThres = 0, pol = "positive", instrumentTypes = NA, instruments = NA, sources = NA, xcmsGroups = NA,
                         pids = NA, rtrange = c(NA, NA), spectraTypes = NA, accessions = NA, con) {
@@ -650,9 +667,19 @@ filterPrecursors <- function(q_pid, q_speakmeta, l_speakmeta, q_ppmPrec, l_ppmPr
   return(l_speakmetaFiltered)
 }
 
-F_FixedMatching <- function(top = top, bottom = bottom, mztol = 0.005) { ## Fixed matching
+F_FixedMatching <- function(top = top, bottom = bottom, mztol = 0.005) {## Fixed matching with Da unit
   for (i in 1:nrow(bottom)) {
     top[, 1][abs(bottom[, 1][i] - top[, 1]) < mztol] <- bottom[, 1][i]
+  }
+  alignment <- merge(top, bottom, by = 1, all = TRUE) # use the bottom (library) as reference
+  alignment[, c(2, 3)][is.na(alignment[, c(2, 3)])] <- 0 # convert NAs to zero (R-Help, Sept. 15, 2004, John Fox)
+  names(alignment) <- c("mz", "intensity.top", "intensity.bottom")
+  # print(alignment)
+  return(alignment)
+}
+F_FixedMatchingPPM <- function(top = top, bottom = bottom, mztol = 5) {## Fixed matching with PPM unit
+  for (i in 1:nrow(bottom)) {
+    top[, 1][abs(bottom[, 1][i] - top[, 1]) < mztol * bottom[, 1][i] / 1000000] <- bottom[, 1][i]
   }
   alignment <- merge(top, bottom, by = 1, all = TRUE) # use the bottom (library) as reference
   alignment[, c(2, 3)][is.na(alignment[, c(2, 3)])] <- 0 # convert NAs to zero (R-Help, Sept. 15, 2004, John Fox)
@@ -686,6 +713,7 @@ getScanPeaksSqlite <- function(con, spectraFilter = TRUE, spectraTypes = NA, raT
   }
   return(speaks)
 }
+
 getXcmsSmSummary <- function(con, matched, scoreF = 0, fragNmF = 1, spectraTypes = "scan") {
   if ("scan" %in% spectraTypes) {
     sqlStmt <- sprintf("SELECT c_peak_groups.*,
@@ -716,6 +744,7 @@ getXcmsSmSummary <- function(con, matched, scoreF = 0, fragNmF = 1, spectraTypes
   xcmsMatchedResults <- xcmsMatchedResults[order(xcmsMatchedResults$grpid, -as.numeric(xcmsMatchedResults$dpc)), ]
   return(xcmsMatchedResults)
 }
+
 getSmeta <- function(con, pids = NA) {
   if (DBI::dbExistsTable(con, "s_peak_meta")) {
     speakmeta <- con %>% dplyr::tbl("s_peak_meta")
@@ -755,7 +784,7 @@ getPeakCols <- function(con) {
 #' @description
 #' Similarity score calculation for a data frame
 #' @export
-MSsim <- function(alignment) { 
+MSsim <- function(alignment) { ## similarity score calculation
   alignment <- data.frame(alignment)
   # print(alignment)
   # score <- as.numeric(0)
@@ -768,34 +797,30 @@ MSsim <- function(alignment) {
   return(score)
 }
 
-F_MergeTarget <- function(Target) {
-  Target <- data.table(Target)
-  TargetUni <- unique(Target, by = "mz")
-  Container <- data.table()
-  for (i in 1:nrow(TargetUni)) {
-    mzUni <- TargetUni[i, ]$mz
-    DT <- data.table(
-      "mz" = mzUni,
-      "intensity.top" = sum(Target[mz == mzUni, ]$intensity.top), # calculate the sum of the intensity top
-      "intensity.bottom" = TargetUni[i, ]$intensity.bottom
-    )
-    Container <- rbind(Container, DT)
+F_MergeTarget <- function(Target){
+  Target<-data.table(Target)
+  TargetUni<-unique(Target,by='mz')
+  Container<-data.table()
+  for (i in 1:nrow(TargetUni)){
+    mzUni<-TargetUni[i,]$mz
+    DT<-data.table('mz'=mzUni,
+                   'intensity.top'= sum(Target[mz==mzUni,]$intensity.top), # calculate the sum of the intensity top
+                   'intensity.bottom'=TargetUni[i,]$intensity.bottom)
+    Container<-rbind(Container,DT)
   }
   return(as.data.frame(Container))
 }
 
-F_MergeDecoy <- function(Decoy) {
-  Decoy <- data.table(Decoy)
-  DecoyUni <- unique(Decoy, by = "mz")
-  Container <- data.table()
-  for (i in 1:nrow(DecoyUni)) {
-    mzUni <- DecoyUni[i, ]$mz
-    DT <- data.table(
-      "mz" = mzUni,
-      "intensity.top" = mean(Decoy[mz == mzUni, ]$intensity.top), # calculate the mean of the intensity top
-      "intensity.bottom" = DecoyUni[i, ]$intensity.bottom
-    )
-    Container <- rbind(Container, DT)
+F_MergeDecoy <- function(Decoy){
+  Decoy<-data.table(Decoy)
+  DecoyUni<-unique(Decoy,by='mz')
+  Container<-data.table()
+  for (i in 1:nrow(DecoyUni)){
+    mzUni<-DecoyUni[i,]$mz
+    DT<-data.table('mz'=mzUni,
+                   'intensity.top'= mean(Decoy[mz==mzUni,]$intensity.top), # calculate the mean of the intensity top
+                   'intensity.bottom'=DecoyUni[i,]$intensity.bottom)
+    Container<-rbind(Container,DT)
   }
   return(as.data.frame(Container))
 }
@@ -811,8 +836,8 @@ pullPid <- function(sp, pids) {
   return(pids)
 }
 
-queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmProd, l_spectraFilter, q_spectraFilter, l_raThres, q_raThres, usePrecursors, mzW, raW, rttol,mztol, dbDetails) {
-  print(paste(q_pid, 'mztol', mztol))
+queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmProd, l_spectraFilter, q_spectraFilter, l_raThres, q_raThres, usePrecursors, mzW, raW, rttol,mztol,libsch,decoy, dbDetails) {
+  print(paste(q_pid, 'mztol', mztol , 'libsch', libsch, 'decoy' , decoy))
   q_con <- DBI::dbConnect(RSQLite::SQLite(), dbDetails$q$pth)
   l_con <- DBI::dbConnect(RSQLite::SQLite(), dbDetails$l$pth)
   q_speakmetai <- getSmeta(q_con, q_pid) %>% dplyr::collect()
@@ -860,14 +885,17 @@ queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmP
                           l_ppmProd = l_ppmProd,
                           raW = raW,
                           mzW = mzW,
-                          mztol = mztol
+                          mztol = mztol,
+                          libsch = libsch,
+                          decoy = decoy
   )
   searched$query_qpid <- q_pid
   # searched$query_rt <- as.numeric(q_speakmetai$retention_time)/60
   searched$query_rt <- as.numeric(q_speakmetai$retention_time[1])
   # searched$query_accession <- q_speakmetai$accession
   searched$query_precursor_mz <- q_speakmetai$precursor_mz[1]
-  # searched$query_inchikey <- q_speakmetai$inchikey_id
+  searched$query_inchikey <- q_speakmetai$inchikey_id
+  searched$query_entry_name <- q_speakmetai$name
   # searched$query_instrument_type <- q_speakmetai$instrument_type
   # searched$query_smiles <- q_speakmetai$smiles
   # if ("inPurity" %in% colnames(q_speakmetai)) {
@@ -875,11 +903,12 @@ queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmP
   # } else {
   #   searched$query_precursor_ion_purity <- NA
   # }
+  # print(searched)
   DBI::dbDisconnect(q_con)
   DBI::dbDisconnect(l_con)
   return(searched)
 }
-queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmProd, l_ppmProd, raW, mzW, mztol) {
+queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmProd, l_ppmProd, raW, mzW, mztol,libsch,decoy) {
   if ("pid" %in% colnames(l_speaks)) {
     l_speaksi <- l_speaks %>%
       dplyr::filter(pid == l_pid) %>%
@@ -894,7 +923,7 @@ queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmPr
   
   l_speaksi$ra <- l_speaksi$i
   q_speaksi$ra <- q_speaksi$i
-  am <- alignAndMatch(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol)
+  am <- alignAndMatch(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,libsch,decoy)
   if ("pid" %in% colnames(l_speakmetai)) {
     lpids <- l_speakmetai$pid
   } else {
@@ -923,7 +952,6 @@ queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmPr
            "library_lpid" = lpids
   ))
 }
-
 
 
 

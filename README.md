@@ -22,6 +22,7 @@ if(!requireNamespace("devtools", quietly = TRUE))
     install.packages("devtools")
 devtools::install_github("xiaodfeng/DynamicTol")
 ```
+In case the installation of DynamicTol package is failed, you can load all the packages and functions at once by using the scripts in the Alternative way to use the package.R file of the vignettes folder.
 
 # Bug reporting
 

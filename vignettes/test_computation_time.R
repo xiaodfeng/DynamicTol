@@ -62,4 +62,4 @@ tictoc::toc() # Ending time of search 20272.5 sec elapsed
 # for test end
 # Here we used the for loop to perform the library search per query, some of the query has the related
 # candidates in the database, some of the query do not have, thus returned no results
-# The total time is 20272.5 sec, thus 14 seconds per spectra on average.
+# The total time is 20272.5 seconds, thus 14 seconds per spectra on average.
