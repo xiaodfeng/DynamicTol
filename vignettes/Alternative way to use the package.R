@@ -5,6 +5,7 @@
 #### Install and load libraries ####
 # .libPaths()
 library(blandr)
+library(BiocStyle) # used for R markdown file
 library(CAMERA)
 library(cowplot)
 library(ChemmineOB)

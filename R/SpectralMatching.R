@@ -456,7 +456,8 @@ spectralMatching <- function(q_dbPth,
   # Add rtdiff
   # matched$rtdiff <- as.numeric(matched$library_rt) - as.numeric(matched$query_rt)
   name <- paste0(q_pids,'_',mztol,'_',libsch, '.csv')
-  write.csv(matched, name,row.names = F)
+  # write.csv(matched, name,row.names = FALSE) #
+  data.table::fwrite(matched, name) # faster method to write the csv files.
   return(matched)
 }
 
@@ -859,7 +860,7 @@ queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmP
     l_fspeakmeta <- l_speakmeta %>%
       dplyr::filter((q_precMZhi >= precursor_mz - ((precursor_mz * 0.000001) * l_ppmPrec)) &
                       (precursor_mz + ((precursor_mz * 0.000001) * l_ppmPrec) >= q_precMZlo)) %>%
-      summarise(id)  %>% # need to change pid
+      # summarise(id)  %>% # need to change pid
       dplyr::collect()
   } else {
     l_fspeakmeta <- l_speakmeta %>% dplyr::collect()
