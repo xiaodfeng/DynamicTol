@@ -212,7 +212,7 @@ spectralMatching <- function(q_dbPth,
                              l_ppmProd = 10,
                              l_ppmPrec = 5,
                              l_raThres = NA,
-                             l_pol = NA,
+                             l_pol = 'positive',
                              l_instrumentTypes = NA,
                              l_instruments = NA,
                              l_sources = NA,
@@ -227,6 +227,8 @@ spectralMatching <- function(q_dbPth,
                              mzW = 0,
                              rttol = NA,
                              mztol = NA,
+                             MRPValue = 17500, 
+                             RefMZValue = 200,
                              libsch = 'reverse', # reverse for reverse library search, and forward for forward library search
                              decoy = FALSE, # TRUE to generate the decoy spectra
                              q_dbType = "sqlite",
@@ -246,7 +248,9 @@ spectralMatching <- function(q_dbPth,
                              copyDb = FALSE,
                              HalfLenth= 75,
                              outPth = "sm_result.sqlite") {
-  # message("Running modified msPurity spectral matching function for LC-MS(/MS) data ")
+  message("Running modified msPurity spectral matching function for LC-MS(/MS) data ")
+  # Call dbplyr explicitly here (so that the bioconductor checks know that we use it)
+  dbplyre <- dbplyr::dbplyr_edition()
   # if (updateDb && copyDb) {
   #   file.copy(from = q_dbPth, to = outPth)
   #   q_dbPth <- outPth
@@ -255,7 +259,7 @@ spectralMatching <- function(q_dbPth,
     l_dbPth <- system.file("extdata", "library_spectra", "library_spectra.db", package = "msPurityData")
   }
   # Filter the query dataset
-  # message("Filter query dataset")
+  message("Filter query dataset")
   q_con <- DBI::dbConnect(RSQLite::SQLite(), q_dbPth)
   q_speakmeta <- filterSMeta(
     purity = q_purity,
@@ -271,7 +275,7 @@ spectralMatching <- function(q_dbPth,
     accessions = q_accessions
   )
   # Filter the library dataset
-  # message("Filter library dataset")
+  message("Filter library dataset")
   l_con <- DBI::dbConnect(RSQLite::SQLite(), l_dbPth)
   l_speakmeta <- filterSMeta(
     purity = l_purity,
@@ -313,15 +317,12 @@ spectralMatching <- function(q_dbPth,
   )
   q_fpids <- pullPid(q_speakmeta) # extract the query ids
   l_fpids <- pullPid(l_speakmeta)
-  # message("aligning and matching")
+  message("aligning and matching")
   # Check cores and choose if parallel or not (do or dopar)
   if (cores > 1) {
-    # cl <- parallel::makeCluster(cores, type = "SOCK")
-    # doSNOW::registerDoSNOW(cl)
-    # clusterCall(cl, function() library(magrittr))
-    cl = createCluster(cores,
-                       export = list('getSmeta','getScanPeaksSqlite','getPeakCols','queryVlibrarySingle','alignAndMatch','align','mzCompare','overlap','dpc'),
-                       lib = list('ggplot2','plyr','dplyr','data.table'))
+    cl <- parallel::makeCluster(cores, type = "SOCK")
+    doSNOW::registerDoSNOW(cl)
+    # parallel::clusterCall(cl, function() library(magrittr))
     parallel <- TRUE
     print(paste('Core number',cl))
   } else {
@@ -329,7 +330,14 @@ spectralMatching <- function(q_dbPth,
   }
   # run parallel (or not) using foreach
   matched <- plyr::adply(q_fpids, 1, queryVlibrary,
-                         # .paropts = list(.export=c('getSmeta'),.packages=.packages(all.available=T)),
+                         .paropts = list(.export=c('alignAndMatch','F_DynamicMatching',
+                                                   'F_FixedMatching','F_FixedMatchingPPM','filterSMeta','filterPrecursors',
+                                                   'getSmeta','getScanPeaksSqlite','getMetaCols','getPeakCols',
+                                                   'MSsim','F_MergeTarget','F_MergeDecoy',
+                                                   'pullPid',
+                                                   'queryVlibrarySingle'),
+                                         .packages=c('plyr','dplyr','data.table')
+                                         ),
                          l_pids = l_fpids,
                          q_ppmPrec = q_ppmPrec,
                          q_ppmProd = q_ppmProd,
@@ -344,13 +352,15 @@ spectralMatching <- function(q_dbPth,
                          raW = raW,
                          rttol = rttol,
                          mztol = mztol,
+                         MRPValue = MRPValue, 
+                         RefMZValue = RefMZValue,
                          libsch = libsch,
                          decoy = decoy,
                          dbDetails = dbDetails,
                          .parallel = parallel
   )
   if (cores > 1) {
-    stopCluster(cl)
+    parallel::stopCluster(cl)
   }
   if (nrow(matched) == 0) {
     message("No matches found")
@@ -362,7 +372,7 @@ spectralMatching <- function(q_dbPth,
   # nmCols <- c("dpc","dpc.decoy","dpc.xcorr","mcount", "allcount", "mpercent")
   # matched[,nmCols] <- as.numeric(as.character(unlist(matched[,nmCols])))
   # make sure all NA values are fully NA values
-  # Add information from other tables
+  message("Add information from other tables")
   if (DBI::dbExistsTable(l_con, "library_spectra_source")) {
     additional_details <- DBI::dbGetQuery(l_con, sprintf("SELECT lsm.id AS lpid,
                                                          s.name AS library_source_name,
@@ -458,10 +468,12 @@ spectralMatching <- function(q_dbPth,
   name <- paste0(q_pids,'_',mztol,'_',libsch, '.csv')
   # write.csv(matched, name,row.names = FALSE) #
   data.table::fwrite(matched, name) # faster method to write the csv files.
+  DBI::dbDisconnect(q_con)
+  DBI::dbDisconnect(l_con)
   return(matched)
 }
 
-alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,libsch,decoy) {
+alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,MRPValue,RefMZValue,libsch,decoy) {
   # For testing purpose begin
   # top <-data.frame("mz" = c(86.09695,486.42896,610.41681,669.48749,
   #                           104.10786,114.41492,131.05865,146.98178,230.20305),
@@ -480,7 +492,7 @@ alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, 
   #
   # l_speaksi<-MS2_18374
   # For testing purpose end
-  ## Normalization
+  # message('Normalization') 
   q_speaksi$ra <- (q_speaksi$i / max(q_speaksi$i)) * 100
   l_speaksi$ra <- (l_speaksi$i / max(l_speaksi$i)) * 100
   ## Scaling factor
@@ -491,7 +503,7 @@ alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, 
   top.ra <- data.frame('mz'=q_speaksi$mz,'intensity'=q_speaksi$ra)
   bottom.ra <- data.frame('mz'=l_speaksi$mz,'intensity'=l_speaksi$ra)
   # aligned <- align(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raDiffThres = 10) # original function, slow
-  ## Target
+  # message('Target search') 
   if (is.na(mztol)) {     ## Dynamic matching
     Align <- F_DynamicMatching(top = top, bottom = bottom, MRP= MRPValue,RefMZ = RefMZValue) #
   } else if (mztol <= 1) {     ## Fixed matching with Da unit
@@ -659,7 +671,6 @@ filterSMeta <- function(purity = NA, raThres = 0, pol = "positive", instrumentTy
     speakmeta <- speakmeta %>% dplyr::filter(spectrum_type %in% spectraTypes)
   }
   # print("speakmeta")
-  # print(speakmeta)
   return(speakmeta)
 }
 
@@ -837,13 +848,17 @@ pullPid <- function(sp, pids) {
   return(pids)
 }
 
-queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmProd, l_spectraFilter, q_spectraFilter, l_raThres, q_raThres, usePrecursors, mzW, raW, rttol,mztol,libsch,decoy, dbDetails) {
+queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmProd, l_spectraFilter, 
+                          q_spectraFilter, l_raThres, q_raThres, usePrecursors, mzW, raW, rttol,mztol,MRPValue,RefMZValue,libsch,decoy, dbDetails) {
+  # message("queryVlibrary")
   print(paste(q_pid, 'mztol', mztol , 'libsch', libsch, 'decoy' , decoy))
   q_con <- DBI::dbConnect(RSQLite::SQLite(), dbDetails$q$pth)
   l_con <- DBI::dbConnect(RSQLite::SQLite(), dbDetails$l$pth)
   q_speakmetai <- getSmeta(q_con, q_pid) %>% dplyr::collect()
+  # print(q_speakmetai)
   ## Here we extract the MS2 peaks, important for calculating the dot product
   q_speaksi <- getScanPeaksSqlite(q_con, spectraFilter = q_spectraFilter, pids = q_pid) %>% dplyr::collect()
+  # print(q_speaksi)
   # if no peaks, then skip
   if (nrow(q_speaksi) == 0) {
     return(NULL)
@@ -878,7 +893,14 @@ queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmP
   }
   ## Use this loop to match each library MS2 to the selected query MS2
   searched <- plyr::adply(l_fpids, 1, queryVlibrarySingle,
-                          # .paropts = list(.export=c('getSmeta'),.packages=.packages(all.available=T)),
+                          .paropts = list(.export=c('alignAndMatch','F_DynamicMatching',
+                                                    'F_FixedMatching','F_FixedMatchingPPM','filterSMeta','filterPrecursors',
+                                                    'getSmeta','getScanPeaksSqlite','getMetaCols','getPeakCols',
+                                                    'MSsim','F_MergeTarget','F_MergeDecoy',
+                                                    'pullPid',
+                                                    'queryVlibrarySingle'),
+                                          .packages=c('plyr','dplyr','data.table')
+                          ),
                           q_speaksi = q_speaksi,
                           l_speakmeta = l_speakmeta,
                           l_speaks = l_speaks,
@@ -887,9 +909,12 @@ queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmP
                           raW = raW,
                           mzW = mzW,
                           mztol = mztol,
+                          MRPValue = MRPValue,
+                          RefMZValue = RefMZValue,
                           libsch = libsch,
                           decoy = decoy
   )
+  # conflicted::conflicts_prefer(bslib::bootstrap)
   searched$query_qpid <- q_pid
   # searched$query_rt <- as.numeric(q_speakmetai$retention_time)/60
   searched$query_rt <- as.numeric(q_speakmetai$retention_time[1])
@@ -909,7 +934,7 @@ queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmP
   DBI::dbDisconnect(l_con)
   return(searched)
 }
-queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmProd, l_ppmProd, raW, mzW, mztol,libsch,decoy) {
+queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmProd, l_ppmProd, raW, mzW, mztol,MRPValue,RefMZValue,libsch,decoy) {
   if ("pid" %in% colnames(l_speaks)) {
     l_speaksi <- l_speaks %>%
       dplyr::filter(pid == l_pid) %>%
@@ -924,7 +949,7 @@ queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmPr
   
   l_speaksi$ra <- l_speaksi$i
   q_speaksi$ra <- q_speaksi$i
-  am <- alignAndMatch(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,libsch,decoy)
+  am <- alignAndMatch(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,MRPValue,RefMZValue,libsch,decoy)
   if ("pid" %in% colnames(l_speakmetai)) {
     lpids <- l_speakmetai$pid
   } else {

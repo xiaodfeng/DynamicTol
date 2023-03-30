@@ -7,7 +7,8 @@
 # for annotation of 1,500 spectra, resulting in around 14 seconds per spectra on average.
 # The library used in this script can be found in https://doi.org/10.5281/zenodo.7549795
 # The 20210423_mona.sqlite file is originally downloaded via https://github.com/computational-metabolomics/msp2db/releases/tag/v0.0.14-mona-23042021
-
+library(dplyr)
+library(data.table)
 #### Access the library information ####
 Path <- 'd:/github/dynamic/input/sqlite/' # here the user needs to change into your own local path accordingly
 l_dbPthValue <- paste0(Path,'20210423_mona.sqlite') # 
@@ -27,9 +28,17 @@ library_spectra <- con %>%
 Meta <- library_spectra_meta
 names(Meta) # check the names of the Meta
 nrow(Meta) # 661421
-
-#### Create the query sqlite database with 1500 Spectra ####
 set.seed(123)
+#### Create the query sqlite database with 2 Spectra ####
+Meta2 <- Meta1500[1:2]
+con_Query2 <- DBI::dbConnect(RSQLite::SQLite(), paste0(Path,'Query2.sqlite'))
+DBI::dbWriteTable(con_Query2, name = "library_spectra_meta", value = Meta2,overwrite=TRUE)
+names(library_spectra)
+library_spectra_Query2 <- library_spectra[library_spectra_meta_id %in% Meta2$id, ]
+unique(library_spectra_Query2, by = "library_spectra_meta_id") # to double check it is 1500 spectra
+DBI::dbWriteTable(con_Query2, name = "library_spectra", value = library_spectra_Query2,overwrite=TRUE)
+DBI::dbWriteTable(con_Query2, name = "metab_compound", value = metab_compound,overwrite=TRUE)
+#### Create the query sqlite database with 1500 Spectra ####
 Meta1500 <- Meta[sample(.N, 1500)] # random selection of 1500 as query
 con_Query1500 <- DBI::dbConnect(RSQLite::SQLite(), paste0(Path,'Query1500.sqlite'))
 DBI::dbWriteTable(con_Query1500, name = "library_spectra_meta", value = Meta1500)
@@ -48,17 +57,28 @@ DBI::dbWriteTable(con_Library10e5, name = "library_spectra", value = library_spe
 DBI::dbWriteTable(con_Library10e5, name = "metab_compound", value = metab_compound)
 
 #### Search query againtst library to test the computation time ####
-MRPValue <- 17500
-RefMZValue <- 200
+MRPValue <<- 17500
+RefMZValue <<- 200
+Pth_Query2 <- paste0(Path,"Query2.sqlite")
 Pth_Query1500 <- paste0(Path,"Query1500.sqlite")
 Pth_Library10e5 <- paste0(Path,"Library10e5.sqlite")
 setwd("output")
 # for test begin
-tictoc::tic() # Starting time of search
-for (id in Meta1500$id) {
-  spectralMatching(q_dbPth = Pth_Query1500, l_dbPth = Pth_Library10e5, q_pids = id)
+tictoc::tic()
+for (id in Meta2$id) {
+  spectralMatching(q_dbPth = Pth_Query2, l_dbPth = Pth_Library10e5, 
+                   q_pids = id)
 }
-tictoc::toc() # Ending time of search 20272.5 sec elapsed
+tictoc::toc() # 30 seconds for 2 query
+
+tictoc::tic()
+spectralMatching(q_dbPth = Pth_Query2, l_dbPth = Pth_Library10e5)
+tictoc::toc() # 22 seconds for 2 query
+
+tictoc::tic()
+spectralMatching(q_dbPth = Pth_Query2, l_dbPth = Pth_Library10e5,cores = 2)
+tictoc::toc() 
+
 # for test end
 # Here we used the for loop to perform the library search per query, some of the query has the related
 # candidates in the database, some of the query do not have, thus returned no results
