@@ -52,37 +52,23 @@
 #'
 #' @param q_dbPth character; Path of the database of queries that will be searched against the library spectra. Generated from createDatabase
 #' @param l_dbPth character; path to library spectral SQLite database. Defaults to msPurityData package data.
-#'
-#' @param q_purity character; Precursor ion purity threshold for the query spectra
-#' @param q_ppmProd numeric; ppm tolerance for query product
 #' @param q_ppmPrec numeric; ppm tolerance for query precursor
-#' @param q_raThres numeric; Relative abundance threshold for query spectra
 #' @param q_pol character; Polarity of query spectra ('positive', 'negative', NA).
 #' @param q_instrumentTypes vector; Instrument types for query spectra.
 #' @param q_instruments vector; Instruments for query spectra (note that this is used in combination with q_instrumentTypes - any
 #'                              spectra matching either q_instrumentTypes or q_instruments will be used).
 #' @param q_sources vector; Sources of query spectra (e.g. massbank, hmdb).
-#' @param q_spectraTypes character; Spectra types of query spectra to perfrom spectral matching e.g. ('scan', 'av_all', 'intra', 'inter')
 #' @param q_pids vector; pids for query spectra (correspond to column 'pid; in s_peak_meta)
 #' @param q_rtrange vector; retention time range (in secs) of query spectra, first value mininum time and second value max e.g. c(0, 10) is between 0 and 10 seconds
-#' @param q_spectraFilter boolean; For query spectra, if prior filtering performed with dynamic, flag peaks will be removed from spectral matching
-#' @param q_xcmsGroups vector; XCMS group ids for query spectra
 #' @param q_accessions vector; accession ids to filter query spectra
-#'
-#' @param l_purity character; Precursor ion purity threshold for the library spectra (uses interpolated purity - inPurity)
-#' @param l_ppmProd numeric; ppm tolerance for library product
 #' @param l_ppmPrec numeric; ppm tolerance for library precursor
-#' @param l_raThres numeric; Relative abundance threshold for library spectra
 #' @param l_pol character; Polarity of library spectra ('positive', 'negative', NA)
 #' @param l_instrumentTypes vector; Instrument types for library spectra.
 #' @param l_instruments vector; Instruments for library spectra (note that this is used in combination with q_instrumentTypes - any
 #'                              spectra matching either q_instrumentTypes or q_instruments will be used).
 #' @param l_sources vector; Sources of library spectra (e.g. massbank, hmdb).
-#' @param l_spectraTypes vector; Spectra type of library spectra to perfrom spectral matching with e.g. ('scan', 'av_all', 'intra', 'inter')
 #' @param l_pids vector; pids for library spectra (correspond to column 'pid; in s_peak_meta)
 #' @param l_rtrange vector; retention time range (in secs) of library spectra, first value mininum time and second value max e.g. c(0, 10) is between 0 and 10 seconds
-#' @param l_spectraFilter boolean; For library spectra, if prior filtering performed with dynamic, flag peaks will be removed from spectral matching
-#' @param l_xcmsGroups vector; XCMS group ids for library spectra
 #' @param l_accessions vector; accession ids to filter library spectra
 #'
 #' @param usePrecursors boolean; If TRUE spectra will be filtered by similarity of precursors based on ppm range defined by l_ppmPrec and q_ppmPrec
@@ -96,52 +82,14 @@
 #' @param outPth character; If copying the database - the path of the new database file
 #'
 #' @param q_dbType character; Query database type for compound database can be either (sqlite, postgres or mysql)
-#' @param q_dbName character; Query database name (only applicable for postgres and mysql)
-#' @param q_dbHost character; Query database host (only applicable for postgres and mysql)
-#' @param q_dbPort character; Query database port (only applicable for postgres and mysql)
-#' @param q_dbUser character; Query database user (only applicable for postgres and mysql)
-#' @param q_dbPass character; Query database pass - Note this is not secure! use with caution (only applicable for postgres and mysql)
-#'
 #' @param l_dbType character; Library database type for compound database can be either (sqlite, postgres or mysql)
-#' @param l_dbName character; Library database name (only applicable for postgres and mysql)
-#' @param l_dbHost character; Library database host (only applicable for postgres and mysql)
-#' @param l_dbPort character; Library database port (only applicable for postgres and mysql)
-#' @param l_dbUser character; Library database user (only applicable for postgres and mysql)
-#' @param l_dbPass character; Library database pass - Note this is not secure! use with caution (only applicable for postgres and mysql)
 #'
 #' @return Returns a list containing the following elements
 #'
 #' **q_dbPth**
 #'
 #' Path of the query database (this will have been updated with the annotation results if updateDb argument used)
-#'
-#'**xcmsMatchedResults**
-#'
-#'  If the qeury spectra had XCMS based chromotographic peaks tables (e.g c_peak_groups, c_peaks) in the sqlite database - it will
-#' be possible to summarise the matches for each XCMS grouped feature. The dataframe contains the following columns
-#'
-#' * lpid - id in database of library spectra
-#' * qpid - id in database of query spectra
-#' * dpc - dot product cosine of the match
-#' * rdpc - reverse dot product cosine of the match
-#' * cdpc - composite dot product cosine of the match
-#' * mcount - number of matching peaks
-#' * allcount - total number of peaks across both query and library spectra
-#' * mpercent - percentage of matching peaks across both query and library spectra
-#' * library_rt - retention time of library spectra
-#' * query_rt - retention time of query spectra
-#' * rtdiff - difference between library and query retention time
-#' * library_precursor_mz - library precursor mz
-#' * query_precursor_mz - query precursor mz
-#' * library_precursor_ion_purity - library precursor ion purity
-#' * query_precursor_ion_purity - query precursor ion purity
-#' * library_accession -  library accession value (unique string or number given to eith MoNA or Massbank data entires)
-#' * library_precursor_type - library precursor type (i.e. adduct)
-#' * library_entry_name - Name given to the library spectra
-#' * inchikey - inchikey of the matched library spectra
-#' * library_source_name - source of the spectra (e.g. massbank, gnps)
-#' * library_compound_name - name of compound spectra was obtained from
-#'
+
 #' **matchedResults**
 #'
 #' All matched results from the query spectra to the library spectra. Contains the same columns as above
@@ -183,8 +131,7 @@
 #' rid <- paste0(paste0(sample(LETTERS, 5, TRUE), collapse=""),  paste0(sample(9999, 1, TRUE), collapse=""), ".sqlite")
 #' sm_out_pth <- file.path(td, rid)
 #'
-#' result <- spectralMatching(q_dbPth, q_xcmsGroups = c(53, 89, 410), cores=1, l_accessions = c('PR100407', 'ML005101', 'CCMSLIB00003740024'),
-#'                           q_spectraTypes = 'av_all',
+#' result <- spectralMatching(q_dbPth, cores=1, l_accessions = c('PR100407', 'ML005101', 'CCMSLIB00003740024'),
 #'                           updateDb = TRUE,
 #'                           copyDb = TRUE,
 #'                           outPth = sm_out_pth)
@@ -192,62 +139,24 @@
 #' }
 #' @md
 #' @export
-SpectralMatching <- function(q_dbPth,
-                             l_dbPth,
-                             q_purity = NA,
-                             q_ppmProd = 10,
-                             q_ppmPrec = 5,
-                             q_raThres = NA,
-                             q_pol = NA,
-                             q_instrumentTypes = NA,
-                             q_instruments = NA,
-                             q_sources = NA,
-                             q_spectraTypes = c("av_all", "inter"),
-                             q_pids = NA,
-                             q_rtrange = c(NA, NA),
-                             q_spectraFilter = FALSE,
-                             q_xcmsGroups = NA,
-                             q_accessions = NA,
-                             l_purity = NA,
-                             l_ppmProd = 10,
-                             l_ppmPrec = 5,
-                             l_raThres = NA,
-                             l_pol = NA,
-                             l_instrumentTypes = NA,
-                             l_instruments = NA,
-                             l_sources = NA,
-                             l_spectraTypes = NA,
-                             l_pids = NA,
-                             l_rtrange = c(NA, NA),
-                             l_spectraFilter = FALSE,
-                             l_xcmsGroups = NA,
-                             l_accessions = NA,
+SpectralMatching <- function(q_dbPth, l_dbPth,
+                             q_ppmPrec = 5, l_ppmPrec = 5,
+                             q_pol = NA, l_pol = NA,
+                             q_instrumentTypes = NA, l_instrumentTypes = NA,
+                             q_instruments = NA, l_instruments = NA,
+                             q_sources = NA, l_sources = NA,
+                             q_pids = NA, l_pids = NA,
+                             q_rtrange = c(NA, NA), l_rtrange = c(NA, NA),
+                             q_accessions = NA, l_accessions = NA,
+                             q_dbType = "sqlite", l_dbType = "sqlite",
                              usePrecursors = TRUE,
-                             raW = 1,
-                             mzW = 0,
-                             rttol = NA,
-                             mztol = NA,
-                             MRPValue = 17500, 
-                             RefMZValue = 200,
+                             updateDb = FALSE, copyDb = FALSE, outPth = "sm_result.sqlite",
+                             raW = 1, mzW = 0,
+                             rttol = NA, mztol = NA, 
+                             MRPValue = 17500, RefMZValue = 200,
                              libsch = 'reverse', # reverse for reverse library search, and forward for forward library search
                              decoy = FALSE, # TRUE to generate the decoy spectra
-                             q_dbType = "sqlite",
-                             q_dbName = NA,
-                             q_dbHost = NA,
-                             q_dbUser = NA,
-                             q_dbPass = NA,
-                             q_dbPort = NA,
-                             l_dbType = "sqlite",
-                             l_dbName = NA,
-                             l_dbHost = NA,
-                             l_dbUser = NA,
-                             l_dbPass = NA,
-                             l_dbPort = NA,
-                             cores = 1,
-                             updateDb = FALSE,
-                             copyDb = FALSE,
-                             HalfLenth= 75,
-                             outPth = "sm_result.sqlite") {
+                             cores = 1, HalfLenth= 75) {
   # Call dbplyr explicitly here (so that the bioconductor checks know that we use it)
   # dbplyre <- dbplyr::dbplyr_edition()
   # if (updateDb && copyDb) {
@@ -261,7 +170,6 @@ SpectralMatching <- function(q_dbPth,
   tictoc::tic("Filter query dataset")
   q_con <- DBI::dbConnect(RSQLite::SQLite(), q_dbPth)
   q_speakmeta <- filterSMeta(
-    purity = q_purity,
     pol = q_pol,
     instrumentTypes = q_instrumentTypes,
     instruments = q_instruments,
@@ -269,16 +177,12 @@ SpectralMatching <- function(q_dbPth,
     pids = q_pids,
     rtrange = q_rtrange,
     con = q_con,
-    xcmsGroups = q_xcmsGroups,
-    spectraTypes = q_spectraTypes,
     accessions = q_accessions
   )
   tictoc::toc()
   tictoc::tic("Filter library dataset")
   l_con <- DBI::dbConnect(RSQLite::SQLite(), l_dbPth)
   l_speakmeta <- filterSMeta(
-    purity = l_purity,
-    raThres = l_raThres,
     pol = l_pol,
     instrumentTypes = l_instrumentTypes,
     instruments = l_instruments,
@@ -286,8 +190,6 @@ SpectralMatching <- function(q_dbPth,
     pids = l_pids,
     rtrange = l_rtrange,
     con = l_con,
-    xcmsGroups = l_xcmsGroups,
-    spectraTypes = l_spectraTypes,
     accessions = l_accessions
   )
   tictoc::toc()
@@ -298,21 +200,11 @@ SpectralMatching <- function(q_dbPth,
   dbDetails <- list(
     "q" = list(
       pth = q_dbPth,
-      type = q_dbType,
-      user = q_dbUser,
-      pass = q_dbPass,
-      dbname = q_dbName,
-      host = q_dbHost,
-      port = q_dbPort
+      type = q_dbType
     ),
     "l" = list(
       pth = l_dbPth,
-      type = l_dbType,
-      user = l_dbUser,
-      pass = l_dbPass,
-      dbname = l_dbName,
-      host = l_dbHost,
-      port = l_dbPort
+      type = l_dbType
     )
   )
   q_fpids <- pullPid(q_speakmeta) # extract the query ids
@@ -322,22 +214,22 @@ SpectralMatching <- function(q_dbPth,
   tictoc::tic("aligning and matching")
   # Check cores and choose if parallel or not (do or dopar)
   if (cores > 1) {
-    parallel <- TRUE
     cl <- parallel::makeCluster(cores, type = "SOCK")
     doSNOW::registerDoSNOW(cl)
     parallel::clusterExport(cl, c('F_CalPMMT','alignAndMatch','F_DynamicMatching','filterSMeta','filterPrecursors','F_FixedMatchingPPM','F_FixedMatching','getScanPeaksSqlite',
                         'getXcmsSmSummary','getSmeta','getMetaCols','getPeakCols','MSsim','F_MergeDecoy','F_MergeTarget','pullPid','queryVlibrary','queryVlibrarySingle'))
     # run parallel (or not) using foreach
-    matched <- foreach(i = q_fpids,.packages = c('data.table','dplyr')) %dopar% queryVlibrary(q_pid=i, l_pids=l_fpids, q_ppmPrec=q_ppmPrec, q_ppmProd=q_ppmProd, l_ppmPrec=l_ppmPrec, l_ppmProd=l_ppmProd, l_spectraFilter=l_spectraFilter, 
-                                                                                q_spectraFilter=q_spectraFilter, l_raThres=l_raThres, q_raThres=q_raThres, usePrecursors=usePrecursors, mzW=mzW, raW=raW, rttol=rttol,
+    matched <- foreach(i = q_fpids,.packages = c('data.table','dplyr','foreach')) %dopar% queryVlibrary(q_pid=i, l_pids=l_fpids, q_ppmPrec=q_ppmPrec, l_ppmPrec=l_ppmPrec, 
+                                                                                usePrecursors=usePrecursors, mzW=mzW, raW=raW, rttol=rttol,
                                                                                 mztol=mztol,MRPValue=MRPValue,RefMZValue=RefMZValue,libsch=libsch,decoy=decoy, dbDetails=dbDetails)
     parallel::stopCluster(cl)
   } else {
-    parallel <- FALSE
-    matched <- foreach(i = q_fpids,.packages = c('data.table','dplyr')) %do% queryVlibrary(q_pid=i, l_pids=l_fpids, q_ppmPrec=q_ppmPrec, q_ppmProd=q_ppmProd, l_ppmPrec=l_ppmPrec, l_ppmProd=l_ppmProd, l_spectraFilter=l_spectraFilter, 
-                                                                             q_spectraFilter=q_spectraFilter, l_raThres=l_raThres, q_raThres=q_raThres, usePrecursors=usePrecursors, mzW=mzW, raW=raW, rttol=rttol,
+    matched <- foreach(i = q_fpids,.packages = c('data.table','dplyr')) %do% queryVlibrary(q_pid=i, l_pids=l_fpids, q_ppmPrec=q_ppmPrec, l_ppmPrec=l_ppmPrec,
+                                                                             usePrecursors=usePrecursors, mzW=mzW, raW=raW, rttol=rttol,
                                                                              mztol=mztol,MRPValue=MRPValue,RefMZValue=RefMZValue,libsch=libsch,decoy=decoy, dbDetails=dbDetails)
   }
+  # View(matched)
+  # print(matched)
   matched <- bind_rows(matched) # Combine the results from lists
   if (nrow(matched) == 0) {
     message("No matches found")
@@ -345,7 +237,7 @@ SpectralMatching <- function(q_dbPth,
   }
   tictoc::toc()
   tictoc::tic("Output results")
-  matched <- matched[, !names(matched) == "X1"]   # remove the plyr id column
+  # matched <- matched[, !names(matched) == "X1"]   # remove the plyr id column
   # ensure numeric
   # nmCols <- c("dpc","dpc.decoy","dpc.xcorr","mcount", "allcount", "mpercent")
   # matched[,nmCols] <- as.numeric(as.character(unlist(matched[,nmCols])))
@@ -430,7 +322,6 @@ SpectralMatching <- function(q_dbPth,
       )
     }
   }
-  # matched <- data.table(matched) # transfer into the data.table format
   # Filter out the candidates with negative Xcorr
   # matched <- matched[(dpD.xcorr>0)]
   # Filter out the candidates with low number of match
@@ -443,12 +334,13 @@ SpectralMatching <- function(q_dbPth,
   # matched$mid <- 1:nrow(matched)
   # Add rtdiff
   # matched$rtdiff <- as.numeric(matched$library_rt) - as.numeric(matched$query_rt)
+  matched <- data.table(matched) # transfer into the data.table format
   name <- paste0('mztol_',mztol,'_libsch_',libsch,'_decoy_',decoy, '.csv')
   # write.csv(matched, name,row.names = FALSE) #
   data.table::fwrite(matched, name,row.names = FALSE) # faster method to write the csv files.
   tictoc::toc()
-  DBI::dbDisconnect(q_con)
-  DBI::dbDisconnect(l_con)
+  on.exit(DBI::dbDisconnect(q_con))
+  on.exit(DBI::dbDisconnect(l_con))
   tictoc::toc()
   return(matched)
 }
@@ -462,7 +354,7 @@ F_CalPMMT <- function(mz, MRP = 17500, RefMZ = 200) {
   B <- A / 2.35482
   return(B * mz^1.5 + mz / 1000000)
 }
-alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,MRPValue,RefMZValue,libsch,decoy) {
+alignAndMatch <- function(q_speaksi, l_speaksi, raW, mzW, mztol,MRPValue,RefMZValue,libsch,decoy) {
   # For testing purpose begin
   # top <-data.frame("mz" = c(86.09695,486.42896,610.41681,669.48749,
   #                           104.10786,114.41492,131.05865,146.98178,230.20305),
@@ -482,6 +374,8 @@ alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, 
   # l_speaksi<-MS2_18374
   # For testing purpose end
   # message('Normalization') 
+  q_speaksi <- as.data.frame(q_speaksi)
+  l_speaksi <- as.data.frame(l_speaksi)
   q_speaksi$ra <- (q_speaksi$i / max(q_speaksi$i)) * 100
   l_speaksi$ra <- (l_speaksi$i / max(l_speaksi$i)) * 100
   ## Scaling factor
@@ -491,7 +385,6 @@ alignAndMatch <- function(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, 
   bottom <- data.frame('mz'=l_speaksi$mz,'intensity'=l_speaksi$w)
   top.ra <- data.frame('mz'=q_speaksi$mz,'intensity'=q_speaksi$ra)
   bottom.ra <- data.frame('mz'=l_speaksi$mz,'intensity'=l_speaksi$ra)
-  # aligned <- align(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raDiffThres = 10) # original function, slow
   # message('Target search') 
   if (is.na(mztol)) {     ## Dynamic matching
     Align <- F_DynamicMatching(top = top, bottom = bottom, MRP= MRPValue,RefMZ = RefMZValue) #
@@ -836,26 +729,25 @@ pullPid <- function(sp, pids) {
   }
   return(pids)
 }
-queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmProd, l_spectraFilter, 
-                          q_spectraFilter, l_raThres, q_raThres, usePrecursors, mzW, raW, rttol,
+queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, l_ppmPrec,
+                          usePrecursors, mzW, raW, rttol,
                           mztol,MRPValue,RefMZValue,libsch,decoy, dbDetails) {
   # message("queryVlibrary")
+  # q_pid <- 5214
   print(paste(q_pid, 'mztol', mztol , 'libsch', libsch, 'decoy' , decoy))
   q_con <- DBI::dbConnect(RSQLite::SQLite(), dbDetails$q$pth)
   l_con <- DBI::dbConnect(RSQLite::SQLite(), dbDetails$l$pth)
-  on.exit(DBI::dbDisconnect(q_con))
-  on.exit(DBI::dbDisconnect(l_con))
   q_speakmetai <- getSmeta(q_con, q_pid) %>% dplyr::collect()
   # print(q_speakmetai)
   ## Here we extract the MS2 peaks, important for calculating the dot product
-  q_speaksi <- getScanPeaksSqlite(q_con, spectraFilter = q_spectraFilter, pids = q_pid) %>% dplyr::collect()
+  q_speaksi <- getScanPeaksSqlite(q_con, pids = q_pid) %>% dplyr::collect()
   # print(q_speaksi)
   # if no peaks, then skip
   if (nrow(q_speaksi) == 0) {
     return(NULL)
   }
   l_speakmeta <- getSmeta(l_con, l_pids) %>% dplyr::collect()
-  l_speaks <- getScanPeaksSqlite(l_con, spectraFilter = l_spectraFilter, pids = l_pids) %>% dplyr::collect()
+  l_speaks <- getScanPeaksSqlite(l_con, pids = l_pids) %>% dplyr::collect()
   if (usePrecursors) {
     q_precMZ <- q_speakmetai$precursor_mz
     # Check if precursors are within tolerance
@@ -877,91 +769,37 @@ queryVlibrary <- function(q_pid, l_pids, q_ppmPrec, q_ppmProd, l_ppmPrec, l_ppmP
   if (nrow(l_fspeakmeta) == 0) {
     return(NULL)
   }
-  if ("pid" %in% colnames(l_fspeakmeta)) {
-    l_fpids <- l_fspeakmeta$pid
-  } else {
-    l_fpids <- l_fspeakmeta$id
-  }
+  l_fpids <- l_fspeakmeta$id
+
   ## Use this loop to match each library MS2 to the selected query MS2 without parallel
-  searched <-
-    foreach::foreach(i = l_fpids, .packages = c('data.table', 'dplyr')) foreach::%do% queryVlibrarySingle(
-      l_pid = i,
-      q_speaksi = q_speaksi,
-      l_speakmeta = l_speakmeta,
-      l_speaks = l_speaks,
-      q_ppmProd = q_ppmProd,
-      l_ppmProd = l_ppmProd,
-      raW = raW,
-      mzW = mzW,
-      mztol = mztol,
-      MRPValue = MRPValue,
-      RefMZValue = RefMZValue,
-      libsch = libsch,
-      decoy = decoy
-    )
-  searched$query_qpid <- q_pid
-  # searched$query_rt <- as.numeric(q_speakmetai$retention_time)/60
-  searched$query_rt <- as.numeric(q_speakmetai$retention_time[1])
-  # searched$query_accession <- q_speakmetai$accession
-  searched$query_precursor_mz <- q_speakmetai$precursor_mz[1]
-  searched$query_inchikey <- q_speakmetai$inchikey_id
-  searched$query_entry_name <- q_speakmetai$name
-  # searched$query_instrument_type <- q_speakmetai$instrument_type
-  # searched$query_smiles <- q_speakmetai$smiles
-  # if ("inPurity" %in% colnames(q_speakmetai)) {
-  #   searched$query_precursor_ion_purity <- q_speakmetai$inPurity
-  # } else {
-  #   searched$query_precursor_ion_purity <- NA
-  # }
-  # print(searched)
-  # DBI::dbDisconnect(q_con)
-  # DBI::dbDisconnect(l_con)
-  return(searched)
+  searched <- foreach(l_fpid = l_fpids, .packages = c('data.table', 'dplyr')) %do% {
+    l_speaksi <- data.frame(l_speaks %>% dplyr::filter(library_spectra_meta_id == l_fpid) %>% dplyr::collect())
+    l_speakmetai <- data.frame(l_speakmeta %>% dplyr::filter(id == l_fpid) %>% dplyr::collect())
+    am <- alignAndMatch(q_speaksi,l_speaksi,raW,mzW,mztol,MRPValue,RefMZValue,libsch,decoy)
+    return(c(am,
+             "query_rt" = as.numeric(q_speakmetai$retention_time),
+             "library_rt" = as.numeric(l_speakmetai$retention_time),
+             "query_qpid" = q_pid,
+             "library_lpid" = l_speakmetai$id,
+             "query_accession" = q_speakmetai$accession,
+             "library_accession" = l_speakmetai$accession,
+             "query_precursor_mz" = q_speakmetai$precursor_mz,
+             "library_precursor_mz" = l_speakmetai$precursor_mz,
+             "query_inchikey" = q_speakmetai$inchikey_id,
+             "library_inchikey" = l_speakmetai$inchikey_id,
+             "query_entry_name" = q_speakmetai$name,
+             "library_entry_name" = l_speakmetai$name,
+             "library_precursor_type" = l_speakmetai$precursor_type,
+             "library_instrument_type" = l_speakmetai$instrument_type,
+             "lpid" = l_speakmetai$id,
+             "library_smiles" = l_speakmetai$smiles
+             ))
+  }
+  on.exit(DBI::dbDisconnect(q_con))
+  on.exit(DBI::dbDisconnect(l_con))
+  return(bind_rows(searched))
 }
-queryVlibrarySingle <- function(l_pid, q_speaksi, l_speakmeta, l_speaks, q_ppmProd, l_ppmProd, raW, mzW, mztol,MRPValue,RefMZValue,libsch,decoy) {
-  if ("pid" %in% colnames(l_speaks)) {
-    l_speaksi <- l_speaks %>%
-      dplyr::filter(pid == l_pid) %>%
-      dplyr::collect()
-    l_speakmetai <- data.frame(l_speakmeta %>% dplyr::filter(pid == l_pid) %>% dplyr::collect())
-  } else {
-    l_speaksi <- l_speaks %>%
-      dplyr::filter(library_spectra_meta_id == l_pid) %>%
-      dplyr::collect()
-    l_speakmetai <- data.frame(l_speakmeta %>% dplyr::filter(id == l_pid) %>% dplyr::collect())
-  }
-  
-  l_speaksi$ra <- l_speaksi$i
-  q_speaksi$ra <- q_speaksi$i
-  am <- alignAndMatch(q_speaksi, l_speaksi, q_ppmProd, l_ppmProd, raW, mzW, mztol,MRPValue,RefMZValue,libsch,decoy)
-  if ("pid" %in% colnames(l_speakmetai)) {
-    lpids <- l_speakmetai$pid
-  } else {
-    lpids <- l_speakmetai$id
-  }
-  if ("retention_time" %in% colnames(l_speakmetai)) {
-    library_rt <- as.numeric(l_speakmetai$retention_time)
-  } else {
-    library_rt <- NA
-  }
-  # if ("inPurity" %in% colnames(l_speakmetai)) {
-  #   library_precursor_ion_purity <- l_speakmetai$inPurity
-  # } else {
-  #   library_precursor_ion_purity <- NA
-  # }
-  return(c(am,
-           "library_rt" = library_rt,
-           "library_accession" = l_speakmetai$accession,
-           "library_precursor_mz" = l_speakmetai$precursor_mz,
-           # "library_precursor_ion_purity" = library_precursor_ion_purity,
-           "library_precursor_type" = l_speakmetai$precursor_type,
-           "library_entry_name" = l_speakmetai$name,
-           "library_inchikey" = l_speakmetai$inchikey_id,
-           "library_instrument_type" = l_speakmetai$instrument_type,
-           "library_smiles" = l_speakmetai$smiles,
-           "library_lpid" = lpids
-  ))
-}
+
 
 
 
