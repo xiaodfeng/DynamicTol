@@ -322,7 +322,7 @@ F_plot.roc <- function(z,name,BinNum=30){
   ColorValues <- c("Dynamic" = "#e6550d", "F0.005" = "#74c476","F0.028" = "#238b45", "F0.050" = "#00441b","PPM5"= "cyan","PPM10"="blue")
   names(ColorValues) <- scorenames
   ## Dynamic
-  roc.Dynamic <- plot.roc(DynamicTarget$outcome, DynamicTarget$score, legacy.axes = T,
+  roc.Dynamic <- pROC::plot.roc(as.factor(DynamicTarget$outcome), as.numeric(DynamicTarget$score), legacy.axes = T,
                           col = ColorValues["Dynamic"], main = name)
   auc.Dynamic<- round(roc.Dynamic$auc,digits = 3)
   l.Dynamic <- paste("Dynamic AUC", auc.Dynamic)

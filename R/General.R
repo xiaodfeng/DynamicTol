@@ -1,15 +1,6 @@
 # This file contains functions used for the spectra processing
 # The functions are sorted alphabetically
-#' @title F_CalPMMT
-#' @description
-#' Calculate the peak matching mass tolerance (PMMT)
-#' according to the mass resolving power (MRP) and reference m/z (RefMZ)
-#' @export
-F_CalPMMT <- function(mz, MRP = 17500, RefMZ = 200) {
-  A <- 1 / (MRP * (RefMZ^0.5))
-  B <- A / 2.35482
-  return(B * mz^1.5 + mz / 1000000)
-}
+
 
 #' @title F_CountCutoff
 #' @description
