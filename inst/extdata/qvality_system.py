@@ -1,66 +1,34 @@
+#%% Introduction and import package
 # This script is extracted and modified based on the qvality.py in triqler 0.6.1 (https://github.com/statisticalbiotechnology/triqler/blob/master/triqler/qvality.py)
 # This is a python port of the C++ code of qvality (https://github.com/percolator/percolator/)
 # It does not include the mix-max corrections, nor the pi0 corrections. Test
-
-
+# this function returns PEPs in ascending order (lowest PEP first)
+# The default includeDecoys = False, we changed into True to enable the plotting of PEP for the decoy scores as well in plotRegressionCurve
+# The default includePEPs = False, we deleted this parameter, as we always output the pep score.
+# The default tdcInput = False, we deleted this parameter, as we always use the target decoy input.
+# The default plotRegressionCurve = False, we changed into True, as this can be of an useful tool to setup the cutoff score.
+# The rest parameters keep the same as the original python script.
 from __future__ import print_function
-
-import subprocess
-import tempfile
-import csv
-import os
-import sys
-
-
-import numpy as np
-import bisect
-
 from threadpoolctl import threadpool_limits
-
+import argparse
+import bisect
+import csv
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import subprocess
+import sys
+import tempfile
+#%% Define functions
 tao = 2.0 / (1 + np.sqrt(5.0)) # inverse of golden section
 scaleAlpha = 1
 stepEpsilon = 1e-8
 gRange = 35.0
 weightSlope = 1e1
-
 VERB = 3 # This is used for output, default value is 3, user can change into 4 to enable the output
-
 # pi0 estimation parameters
 numLambda = 100
 maxLambda = 0.5
-
-# this function returns PEPs in ascending order (lowest PEP first)
-# The default includeDecoys = False, Xiaodong changed into True to enable the plotting of PEP for the decoy scores as well in plotRegressionCurve
-# The default includePEPs = False, Xiaodong deleted this parameter, as we always output the pep score.
-# The default tdcInput = False, Xiaodong deleted this parameter, as we always use the target decoy input.
-# The default plotRegressionCurve = False, Xiaodong changed into True, as this can be of an useful tool to setup the cutoff score.
-# The rest parameters keep the same as the original python script.
-
-# For test purpose begin #
-# N = 500
-# targetScores = np.random.normal(10.0,1,N)
-# decoyScores = np.random.normal(5.0,1,N)
-# includeDecoys = True
-# pi0 = 1.0
-# plotRegressionCurve = True
-# numBins = 500
-# targetScores = np.ravel(r.TarDec[['dpD']])
-# decoyScores = np.ravel(r.TarDec[['dpD.decoy']])
-# peps = getQvaluesFromScores(targetScores, decoyScores)
-# peps
-# targetScores
-# decoyScores
-# peps = getQvaluesFromScores(targetScores, decoyScores)
-
-# print("  Identified", countBelowFDR(peps, 0.01), "PSMs at 1% FDR")
-# peps = peps[::-1] # PEPs in descending order, highest PEP first
-# allScores = np.concatenate((targetScores, decoyScores))
-# allScores.sort()  # scores in ascending order, lowest score first
-# getPEPFromScore = lambda score : peps[min(np.searchsorted(allScores, score, side = 'left'), len(peps) - 1)] if not np.isnan(score) else 1.0
-# return getPEPFromScore
-
-  
-
 
 def getPEPFromScoreLambda(targetScores, decoyScores, Name):
   if len(decoyScores) == 0:
@@ -330,4 +298,72 @@ def splineEval(scores, medians, variables):
   return scores
 
 
-##
+#%% Test run the script
+def compute_qvalues(target_scores, decoy_scores, output, plot, name):
+  # Convert to numpy arrays
+  target_scores = np.array(target_scores)
+  decoy_scores = np.array(decoy_scores)
+
+  if len(target_scores) == 0 or len(decoy_scores) == 0:
+    sys.exit("ERROR: Target or decoy scores are empty.")
+
+  # Compute PEPs
+  peps = getQvaluesFromScores(
+    target_scores,
+    decoy_scores,
+    name if plot else "",  # Use the name only if plotting is enabled
+  )
+  np.savetxt(output, peps, delimiter=",")
+  print(f"Results saved to {output}")
+  return peps
+
+
+def parse_arguments():
+  parser = argparse.ArgumentParser(description="Run Q-value computation.")
+  parser.add_argument("--target_scores", type=str, required=True, help="Path to target scores file (CSV).")
+  parser.add_argument("--decoy_scores", type=str, required=True, help="Path to decoy scores file (CSV).")
+  parser.add_argument("--output", type=str, required=True, help="Path to save output results.")
+  parser.add_argument("--name", type=str, default="RegressionPlot", help="Name for the plot (default: 'RegressionPlot').")
+  parser.add_argument("--no_plot", action="store_true", help="Disable regression curve plotting.")
+  return parser.parse_args()
+
+
+def main():
+  args = parse_arguments()
+
+  try:
+    # Load scores
+    target_scores = np.loadtxt(args.target_scores, delimiter=",")
+    decoy_scores = np.loadtxt(args.decoy_scores, delimiter=",")
+
+    # Plotting enabled by default unless --no_plot is used
+    plot = not args.no_plot
+    compute_qvalues(target_scores, decoy_scores, args.output, plot, args.name)
+  except Exception as e:
+    sys.exit(f"Error: {e}")
+
+
+if __name__ == "__main__":
+  main()
+# For test purpose begin
+# N = 500
+# targetScores = np.random.normal(10.0,1,N)
+# decoyScores = np.random.normal(5.0,1,N)
+# includeDecoys = True
+# pi0 = 1.0
+# plotRegressionCurve = True
+# numBins = 500
+# targetScores
+# decoyScores
+# peps = getQvaluesFromScores(targetScores, decoyScores,Name='Test')
+# peps
+# len(targetScores)
+# len(decoyScores)
+# len(peps)
+# print("  Identified", countBelowFDR(peps, 0.01), "PSMs at 1% FDR")
+# peps = peps[::-1] # PEPs in descending order, highest PEP first
+# allScores = np.concatenate((targetScores, decoyScores))
+# allScores.sort()  # scores in ascending order, lowest score first
+# getPEPFromScore = lambda score : peps[min(np.searchsorted(allScores, score, side = 'left'), len(peps) - 1)] if not np.isnan(score) else 1.0
+# return getPEPFromScore
+# For test purpose end

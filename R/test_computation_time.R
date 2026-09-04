@@ -3,18 +3,15 @@
 # of a new algorithm. In order to facilitate the usage of potentially interested users,
 # we have tested the computational time of 1,500 MS/MS spectra as query
 # and 100,000 spectra as library on a laptop equipped with an Intel Core i7-8550U CPU,
-# 1 TB HDD, and 16GB RAM. The reported time using the tictoc R package is 5.6 hours
-# for annotation of 1,500 spectra, resulting in around 14 seconds per spectra on average.
-# The library used in this script can be found in https://doi.org/10.5281/zenodo.7549795
-# The 20210423_mona.sqlite file is originally downloaded via https://github.com/computational-metabolomics/msp2db/releases/tag/v0.0.14-mona-23042021
-# Here we need to load the SpectralMatching.R function in the package
+# 1 TB HDD, and 16GB RAM.
+# Here we need to load the SpectralMatching2.R function in the package
 library(dplyr)
 library(data.table)
 library(foreach)
 library(parallel)
 #### Access the library information ####
-Path <- 'd:/github/dynamic/input/sqlite/' # here the user needs to change into your own local path accordingly
-l_dbPthValue <- paste0(Path,'20210423_mona.sqlite') #
+Path <- 'd:/OneDrive/github/dynamic/input/Sqlite/' # here the user needs to change into your own local path accordingly
+l_dbPthValue <- paste0(Path,'MoNA-export-All_LC-MS-MS_Orbitrap_MetaFil_0410.sqlite') #
 con <- DBI::dbConnect(RSQLite::SQLite(), l_dbPthValue)
 library_spectra_meta <- con %>%
   dplyr::tbl("library_spectra_meta") %>%
@@ -30,7 +27,7 @@ library_spectra <- con %>%
   as.data.table(.)
 Meta <- library_spectra_meta
 names(Meta) # check the names of the Meta
-nrow(Meta) # 661421
+nrow(Meta) # 57865
 set.seed(123)
 #### Create the query sqlite database with 1500 Spectra ####
 Meta1500 <- Meta[sample(.N, 1500)] # random selection of 1500 as query
@@ -50,31 +47,18 @@ library_spectra_Query2 <- library_spectra[library_spectra_meta_id %in% Meta2$id,
 unique(library_spectra_Query2, by = "library_spectra_meta_id") # to double check it is 1500 spectra
 DBI::dbWriteTable(con_Query2, name = "library_spectra", value = library_spectra_Query2,overwrite=TRUE)
 DBI::dbWriteTable(con_Query2, name = "metab_compound", value = metab_compound,overwrite=TRUE)
-#### Create the library sqlite database with 100000 Spectra ####
-Meta10e5 <- Meta[sample(.N, 100000)] # random selection
-con_Library10e5 <- DBI::dbConnect(RSQLite::SQLite(), paste0(Path, "Library10e5.sqlite"))
-DBI::dbWriteTable(con_Library10e5, name = "library_spectra_meta", value = Meta10e5)
-library_spectra_Library10e5 <- library_spectra[library_spectra_meta_id %in% Meta10e5$id, ]
-unique(library_spectra_Library10e5, by = "library_spectra_meta_id") # to double check it is 10e5 spectra
-DBI::dbWriteTable(con_Library10e5, name = "library_spectra", value = library_spectra_Library10e5)
-DBI::dbWriteTable(con_Library10e5, name = "metab_compound", value = metab_compound)
 
 #### Search query againtst library to test the computation time ####
-MRPValue <<- 17500
-RefMZValue <<- 200
 Pth_Query2 <- paste0(Path,"Query2.sqlite")
 Pth_Query1500 <- paste0(Path,"Query1500.sqlite")
-Pth_Library10e5 <- paste0(Path,"Library10e5.sqlite")
-setwd("output")
-## Searching library with 2 query, 1 core
-Matched <- SpectralMatching(q_dbPth = Pth_Query2, l_dbPth = Pth_Library10e5)
-Matched
-## Searching library with 1500 query, 1 core
-Matched <- SpectralMatching(q_dbPth = Pth_Query1500, l_dbPth = Pth_Library10e5,
-                            cores = 6)
-Matched
-# Here we used the for loop to perform the library search per query, some of the query has the related
-# candidates in the database, some of the query do not have, thus returned no results
-# The total time is 5582 seconds,around 1.55 hours, thus 4 seconds per spectra on average.
+Pth_Library <- l_dbPthValue
+## Searching 57865 library with 2 query, 1 core, 128 hits in 6.3 s (3.150 s per query spectrum)
+Matched <- SpectralMatching2(q_dbPth = Pth_Query2, l_dbPth = Pth_Library, cores = 1)
+## Searching 57865 library with 2 query, 4 core, 128 hits in 14.8 s (7.375 s per query spectrum)
+Matched <- SpectralMatching2(q_dbPth = Pth_Query2, l_dbPth = Pth_Library, cores = 4)
+## Searching 57865 library with 1500 query, 1 core, 107021 hits in 43.7 s (0.029 s per query spectrum)
+Matched <- SpectralMatching2(q_dbPth = Pth_Query1500, l_dbPth = Pth_Library, cores = 1)
+## Searching 57865 library with 1500 query, 4 core, 107021 hits in 27.0 s (0.018 s per query spectrum)
+Matched <- SpectralMatching2(q_dbPth = Pth_Query1500, l_dbPth = Pth_Library, cores = 4)
 
 
