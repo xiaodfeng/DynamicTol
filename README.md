@@ -11,7 +11,7 @@ For more information about the dynamic theory, see the [article](https://www.sci
 
 # System requirement
 
-The package was tested with R (version 4.1.2) on a laptop equipped with an Intel Core i7-8550U CPU, 1 TB HDD, and 16GB RAM
+The package was tested with R (version 4.5.1) on a computer equipped with AMD Ryzen 9 9950X 16-Core CPU, and 96GB RAM.
 
 # Installation
 
@@ -28,7 +28,4 @@ In case the installation of DynamicTol package is failed, you can load all the p
 
 Suggestions and bug reports are more than welcome at:<https://github.com/xiaodfeng/DynamicTol/issues>
 
-## Citation
-
-Please cite this package as: (To be filled in)
 
